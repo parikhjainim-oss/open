@@ -1,0 +1,6 @@
+{
+  "name": "M3 RIDE — Ahmedabad Ride-Hailing Platform",
+  "description": "Integrated ride-hailing platform connecting Riders, Captains, and City Fleet Admin with real-time dispatch, zero-commission daily passes, transparent Indian Rupee fares, and interactive Ahmedabad maps.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
