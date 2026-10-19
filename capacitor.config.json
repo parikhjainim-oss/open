@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.rapido",
+  "appName": "RapidoClone",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
