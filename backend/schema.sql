@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
   vehicle_number VARCHAR(32), status VARCHAR(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'blocked')),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS rider_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(120) NOT NULL,
+  phone VARCHAR(24), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 CREATE TABLE IF NOT EXISTS pricing_rules (
   vehicle_type VARCHAR(24) PRIMARY KEY CHECK (vehicle_type IN ('bike', 'auto', 'cab')),
   base_fare NUMERIC(10,2) NOT NULL CHECK (base_fare >= 0), per_km_rate NUMERIC(10,2) NOT NULL CHECK (per_km_rate >= 0),

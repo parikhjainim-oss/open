@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from 'react';
 import { store } from './services/store';
 import { UserRole, LocationPoint, VehicleCategory, Ride } from './types';
-import { DevRoleSwitcher } from './components/common/DevRoleSwitcher';
 import { RiderHome } from './components/rider/RiderHome';
 import { VehicleSelect } from './components/rider/VehicleSelect';
 import { LiveTripTracking } from './components/rider/LiveTripTracking';
@@ -20,9 +19,17 @@ import { CaptainEarnings } from './components/captain/CaptainEarnings';
 import { CaptainProfile } from './components/captain/CaptainProfile';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { SplitSimulation } from './components/demo/SplitSimulation';
+import { AppSplash } from './components/common/AppSplash';
+import { AuthScreen } from './components/auth/AuthScreen';
+import { authApi, AuthSession } from './services/api';
 
 export default function App() {
-  const [role, setRole] = useState<UserRole | 'split'>(() => store.getState().currentRole);
+  const [session, setSession] = useState<AuthSession | null>(() => authApi.getSession());
+  const [showSplash, setShowSplash] = useState(true);
+  const [role, setRole] = useState<UserRole | 'split'>(() => {
+    const savedSession = authApi.getSession();
+    return savedSession?.user.role === 'driver' ? 'captain' : savedSession?.user.role || store.getState().currentRole;
+  });
 
   // Rider navigation state
   const [riderScreen, setRiderScreen] = useState<'home' | 'vehicle_select' | 'tracking' | 'activity' | 'wallet' | 'profile'>('home');
@@ -46,24 +53,24 @@ export default function App() {
     });
   }, []);
 
-  const handleRoleChange = (newRole: UserRole | 'split') => {
-    setRole(newRole);
-    if (newRole !== 'split') {
-      store.setRole(newRole as UserRole);
-    }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowSplash(false), 2200);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const handleAuthenticated = (nextSession: AuthSession) => {
+    setSession(nextSession);
+    const nextRole: UserRole = nextSession.user.role === 'driver' ? 'captain' : nextSession.user.role;
+    setRole(nextRole);
+    store.setRole(nextRole);
   };
+
+  if (showSplash) return <AppSplash />;
+  if (!session) return <AuthScreen onAuthenticated={handleAuthenticated} />;
 
   return (
     <div className="min-h-screen bg-[#F7F8FA] flex flex-col font-['Inter',sans-serif]">
-      {/* Top Development Role Switcher Bar */}
-      <DevRoleSwitcher
-        currentRole={role}
-        onChangeRole={handleRoleChange}
-        activeRideId={activeRideId}
-      />
-
-      {/* Main Content Area (offset by 40px for top dev bar) */}
-      <div className="pt-10 flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col">
         {/* RIDER APPLICATION */}
         {role === 'rider' && (
           <div className="w-full max-w-md mx-auto min-h-screen bg-white shadow-xl sm:border-x border-gray-200 relative flex flex-col">
