@@ -23,12 +23,16 @@ interface CaptainHomeProps {
   onOpenTripExecution: (rideId: string) => void;
   onOpenEarnings: () => void;
   onOpenProfile: () => void;
+  displayName?: string;
+  displayVehicleNumber?: string;
 }
 
 export const CaptainHome: React.FC<CaptainHomeProps> = ({
   onOpenTripExecution,
   onOpenEarnings,
-  onOpenProfile
+  onOpenProfile,
+  displayName,
+  displayVehicleNumber
 }) => {
   const [captain, setCaptain] = useState<CaptainProfile>(() => store.getState().captains[0]);
   const [incomingRide, setIncomingRide] = useState<Ride | null>(null);
@@ -165,7 +169,7 @@ export const CaptainHome: React.FC<CaptainHomeProps> = ({
               <div className="relative shrink-0">
                 <img
                   className="w-13 h-13 rounded-full object-cover ring-2 ring-orange-200"
-                  alt={captain.name}
+                  alt={displayName || captain.name}
                   src={captain.photo}
                 />
                 <span className="absolute -bottom-1 -right-1 bg-[#0053DB] text-white rounded-full p-0.5 flex items-center justify-center">
@@ -174,14 +178,14 @@ export const CaptainHome: React.FC<CaptainHomeProps> = ({
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base font-bold text-gray-900 truncate">{captain.name}</span>
+                  <span className="text-base font-bold text-gray-900 truncate">{displayName || captain.name}</span>
                   <span className="px-1.5 py-0.2 rounded-full bg-[#FFDBCC] text-[#7A3000] text-[11px] font-extrabold">
                     {captain.rating} ★
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-gray-500 text-xs">
                   <span className="material-symbols-outlined text-[15px]">two_wheeler</span>
-                  <span className="font-bold uppercase tracking-wider">{captain.vehicleNumber}</span>
+                  <span className="font-bold uppercase tracking-wider">{displayVehicleNumber || captain.vehicleNumber}</span>
                 </div>
               </div>
             </div>

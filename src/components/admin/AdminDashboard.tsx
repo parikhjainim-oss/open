@@ -40,7 +40,7 @@ type AdminTab =
   | 'subscriptions'
   | 'support';
 
-export const AdminDashboard: React.FC<{ token: string; onLogout: () => void }> = ({ token, onLogout }) => {
+export const AdminDashboard: React.FC<{ token: string; accountEmail: string; onLogout: () => void }> = ({ token, accountEmail, onLogout }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [state, setState] = useState<AppStoreState>(() => store.getState());
 
@@ -175,7 +175,7 @@ export const AdminDashboard: React.FC<{ token: string; onLogout: () => void }> =
                 OP
               </div>
               <div className="text-left text-xs">
-                <span className="font-bold text-gray-900 block leading-tight">Ahmedabad Dispatch</span>
+                <span className="font-bold text-gray-900 block leading-tight">{accountEmail}</span>
                 <span className="text-[10px] text-gray-500">Administrator</span>
               </div>
             </div>

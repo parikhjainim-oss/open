@@ -63,6 +63,18 @@ export default function App() {
     const nextRole: UserRole = nextSession.user.role === 'driver' ? 'captain' : nextSession.user.role;
     setRole(nextRole);
     store.setRole(nextRole);
+    setRiderScreen('home');
+    setCaptainScreen('home');
+    setBookingParams(null);
+  };
+
+  const handleLogout = () => {
+    authApi.clearSession();
+    setSession(null);
+    setRole('rider');
+    setRiderScreen('home');
+    setCaptainScreen('home');
+    store.setRole('rider');
   };
 
   if (showSplash) return <AppSplash />;
@@ -84,6 +96,7 @@ export default function App() {
                 onOpenActivity={() => setRiderScreen('activity')}
                 onOpenWallet={() => setRiderScreen('wallet')}
                 onOpenProfile={() => setRiderScreen('profile')}
+                displayName={session.user.rider?.name}
               />
             )}
 
@@ -129,7 +142,7 @@ export default function App() {
             )}
 
             {riderScreen === 'profile' && (
-              <RiderProfile onBack={() => setRiderScreen('home')} />
+              <RiderProfile account={session.user} onBack={() => setRiderScreen('home')} onLogout={handleLogout} />
             )}
 
             {completedRide && (
@@ -155,6 +168,8 @@ export default function App() {
                 }}
                 onOpenEarnings={() => setCaptainScreen('earnings')}
                 onOpenProfile={() => setCaptainScreen('profile')}
+                displayName={session.user.driver?.name}
+                displayVehicleNumber={session.user.driver?.vehicleNumber}
               />
             )}
 
@@ -177,18 +192,13 @@ export default function App() {
             )}
 
             {captainScreen === 'profile' && (
-              <CaptainProfile onBack={() => setCaptainScreen('home')} />
+              <CaptainProfile account={session.user} onBack={() => setCaptainScreen('home')} onLogout={handleLogout} />
             )}
           </div>
         )}
 
         {/* ADMIN DASHBOARD */}
-        {role === 'admin' && session && <AdminDashboard token={session.token} onLogout={() => {
-          authApi.clearSession();
-          setSession(null);
-          setRole('rider');
-          store.setRole('rider');
-        }} />}
+        {role === 'admin' && session && <AdminDashboard token={session.token} accountEmail={session.user.email} onLogout={handleLogout} />}
 
         {/* DUAL SCREEN SPLIT VIEW */}
         {role === 'split' && <SplitSimulation />}

@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Header } from '../common/Header';
 import { store } from '../../services/store';
+import { AuthUser } from '../../services/api';
 import { User, Phone, Mail, MapPin, Shield, Bell, Globe, LogOut, Check } from 'lucide-react';
 
 interface RiderProfileProps {
   onBack: () => void;
   onLogout?: () => void;
+  account: AuthUser;
 }
 
-export const RiderProfile: React.FC<RiderProfileProps> = ({ onBack, onLogout }) => {
+export const RiderProfile: React.FC<RiderProfileProps> = ({ onBack, onLogout, account }) => {
   const rider = store.getState().rider;
+  const accountName = account.rider?.name || account.email;
+  const accountPhone = account.rider?.phone;
   const [language, setLanguage] = useState<'Gujarati' | 'Hindi' | 'English'>('Gujarati');
   const [savedMsg, setSavedMsg] = useState(false);
 
@@ -27,12 +31,13 @@ export const RiderProfile: React.FC<RiderProfileProps> = ({ onBack, onLogout }) 
         <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm flex items-center gap-4">
           <img
             src={rider.avatar}
-            alt={rider.name}
+            alt={accountName}
             className="w-16 h-16 rounded-full object-cover ring-4 ring-orange-100"
           />
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-gray-900 truncate">{rider.name}</h2>
-            <p className="text-xs text-gray-500 font-mono">{rider.phone}</p>
+            <h2 className="text-lg font-bold text-gray-900 truncate">{accountName}</h2>
+            <p className="text-xs text-gray-500 font-mono">{accountPhone || 'Phone number not added'}</p>
+            <p className="mt-1 truncate text-xs text-gray-500">{account.email}</p>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full">
                 ★ {rider.rating} Rating

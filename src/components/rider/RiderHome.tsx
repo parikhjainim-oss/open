@@ -11,6 +11,7 @@ interface RiderHomeProps {
   onOpenWallet: () => void;
   onOpenProfile: () => void;
   activeTab: 'home' | 'activity' | 'wallet' | 'profile';
+  displayName?: string;
 }
 
 export const RiderHome: React.FC<RiderHomeProps> = ({
@@ -18,7 +19,8 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
   onOpenActivity,
   onOpenWallet,
   onOpenProfile,
-  activeTab
+  activeTab,
+  displayName
 }) => {
   const [selectedPickup, setSelectedPickup] = useState<LocationPoint>(AHMEDABAD_LOCATIONS[0]);
   const [selectedDrop, setSelectedDrop] = useState<LocationPoint>(AHMEDABAD_LOCATIONS[1]);
@@ -61,7 +63,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex flex-col">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-1.5">
-                Namaste, Aarav <span className="inline-block animate-wiggle">👋</span>
+                Namaste, {displayName?.split(' ')[0] || 'Rider'} <span className="inline-block animate-wiggle">👋</span>
               </h2>
               <p className="text-xs text-gray-500 font-medium">Ready to breeze past Ahmedabad traffic today?</p>
             </div>
