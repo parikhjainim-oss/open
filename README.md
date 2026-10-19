@@ -102,6 +102,10 @@ npm start
 
 For a separate frontend and backend deployment, set the frontend build variable VITE_API_URL to the backend's public HTTPS URL and set backend CORS_ORIGINS to the frontend origin. The client defaults to its own origin when VITE_API_URL is omitted.
 
+### Deploying the full app on Render
+
+Use the root `render.yaml` as a **Node web service** so one HTTPS origin serves both the React app and `/api`. The Blueprint requires an existing PostgreSQL connection string in `DATABASE_URL`, plus `ADMIN_EMAIL` and `ADMIN_PASSWORD` for the initial administrator. It runs the idempotent database migration at service start. Set a strong unique admin password in Render; do not commit it to the repository. The existing static-only Render service cannot run this API; deploy the Node web service and use its URL for the app.
+
 ---
 
 ## 4. Environment Variables (`.env`)

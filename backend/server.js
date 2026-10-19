@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { pool } = require('./db');
 
 const app = express();
@@ -38,7 +40,18 @@ app.get('/api/health', async (_req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-app.use((_req, res) => res.status(404).json({ message: 'Route not found.' }));
+const clientDirectory = path.resolve(__dirname, '..', 'dist');
+const clientEntry = path.join(clientDirectory, 'index.html');
+app.use('/api', (_req, res) => res.status(404).json({ message: 'Route not found.' }));
+if (fs.existsSync(clientEntry)) {
+  app.use(express.static(clientDirectory, { index: false }));
+  app.get('*', (req, res, next) => {
+    if (path.extname(req.path)) return res.status(404).end();
+    return res.sendFile(clientEntry, (error) => { if (error) next(error); });
+  });
+} else {
+  app.use((_req, res) => res.status(404).json({ message: 'Route not found.' }));
+}
 app.use((error, _req, res, _next) => {
   console.error(error);
   const status = error.type === 'entity.parse.failed' ? 400 : 500;

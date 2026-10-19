@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcrypt');
 const { pool } = require('../db');
 const { requireRole } = require('../middleware/auth');
 
@@ -7,9 +8,28 @@ router.use(requireRole('admin'));
 
 router.get('/users', async (_req, res, next) => {
   try {
-    const result = await pool.query(`SELECT u.id, u.email, u.role, u.created_at AS "createdAt", d.name, d.phone, d.vehicle_type AS "vehicleType", d.vehicle_number AS "vehicleNumber", d.status AS "driverStatus" FROM users u LEFT JOIN driver_profiles d ON d.user_id = u.id WHERE u.role IN ('rider', 'driver') ORDER BY u.created_at DESC`);
+    const result = await pool.query(`SELECT u.id, u.email, u.role, u.created_at AS "createdAt", COALESCE(d.name, r.name) AS name, COALESCE(d.phone, r.phone) AS phone, d.vehicle_type AS "vehicleType", d.vehicle_number AS "vehicleNumber", d.status AS "driverStatus" FROM users u LEFT JOIN driver_profiles d ON d.user_id = u.id LEFT JOIN rider_profiles r ON r.user_id = u.id ORDER BY u.created_at DESC`);
     return res.json(result.rows);
   } catch (error) { return next(error); }
+});
+
+router.post('/admins', async (req, res, next) => {
+  const { email, password } = req.body || {};
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail) || typeof password !== 'string' || password.length < 12) {
+    return res.status(400).json({ message: 'Provide a valid email and a password of at least 12 characters.' });
+  }
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'admin') RETURNING id, email, role`,
+      [normalizedEmail, passwordHash],
+    );
+    return res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ message: 'An account with this email already exists.' });
+    return next(error);
+  }
 });
 
 router.patch('/drivers/:id/status', async (req, res, next) => {

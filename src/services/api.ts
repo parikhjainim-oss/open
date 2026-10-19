@@ -40,6 +40,11 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   } catch {
     throw new Error('Cannot reach the M3 RIDE API. Check that the backend is running and VITE_API_URL points to it.');
   }
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    if (response.ok) throw new Error('The API returned a web page instead of JSON. Deploy the backend with the web app or set VITE_API_URL to the backend URL.');
+    throw new Error(`The API returned an unexpected response (${response.status}).`);
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || 'Unable to complete this request.');
   return data as T;
@@ -68,7 +73,7 @@ export const authApi = {
 export interface AdminAccount {
   id: string;
   email: string;
-  role: 'rider' | 'driver';
+  role: 'rider' | 'driver' | 'admin';
   createdAt: string;
   name?: string;
   phone?: string | null;
@@ -79,6 +84,9 @@ export interface AdminAccount {
 
 export const adminApi = {
   listUsers(token: string) { return request<AdminAccount[]>('/api/admin/users', {}, token); },
+  createAdmin(token: string, payload: { email: string; password: string }) {
+    return request<{ id: string; email: string; role: 'admin' }>('/api/admin/admins', { method: 'POST', body: JSON.stringify(payload) }, token);
+  },
   setDriverStatus(token: string, id: string, status: 'approved' | 'blocked') {
     return request<{ id: string; status: string }>(`/api/admin/drivers/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }, token);
   },
