@@ -15,6 +15,7 @@ router.post('/register', async (req, res, next) => {
   if (!/^\S+@\S+\.\S+$/.test(normalizedEmail) || typeof password !== 'string' || password.length < 8) return res.status(400).json({ message: 'Provide a valid email and a password of at least 8 characters.' });
   if (!['rider', 'driver'].includes(role)) return res.status(400).json({ message: 'Role must be rider or driver.' });
   if (!name || typeof name !== 'string' || name.trim().length < 2) return res.status(400).json({ message: 'Provide your name.' });
+  if (typeof phone !== 'string' || phone.replace(/\D/g, '').length < 7 || phone.replace(/\D/g, '').length > 15) return res.status(400).json({ message: 'Provide a valid phone number.' });
   if (role === 'driver' && !['bike', 'auto', 'cab'].includes(vehicleType)) return res.status(400).json({ message: 'Drivers require a valid vehicle type.' });
   const client = await pool.connect();
   try {

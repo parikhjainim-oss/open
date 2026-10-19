@@ -168,8 +168,8 @@ export default function App() {
                 }}
                 onOpenEarnings={() => setCaptainScreen('earnings')}
                 onOpenProfile={() => setCaptainScreen('profile')}
-                displayName={session.user.driver?.name}
-                displayVehicleNumber={session.user.driver?.vehicleNumber}
+                displayName={session.user.driver?.name || 'Driver'}
+                displayVehicleNumber={session.user.driver?.vehicleNumber || 'Not added'}
               />
             )}
 
