@@ -183,7 +183,12 @@ export default function App() {
         )}
 
         {/* ADMIN DASHBOARD */}
-        {role === 'admin' && <AdminDashboard />}
+        {role === 'admin' && session && <AdminDashboard token={session.token} onLogout={() => {
+          authApi.clearSession();
+          setSession(null);
+          setRole('rider');
+          store.setRole('rider');
+        }} />}
 
         {/* DUAL SCREEN SPLIT VIEW */}
         {role === 'split' && <SplitSimulation />}

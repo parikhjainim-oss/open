@@ -1,0 +1,55 @@
+import { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, RefreshCw, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { adminApi, AdminAccount } from '../../services/api';
+
+export function AdminAccounts({ token }: { token: string }) {
+  const [accounts, setAccounts] = useState<AdminAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try { setAccounts(await adminApi.listUsers(token)); }
+    catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Unable to load accounts.'); }
+    finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const updateDriver = async (account: AdminAccount) => {
+    const status = account.driverStatus === 'blocked' ? 'approved' : 'blocked';
+    setSavingId(account.id);
+    setError('');
+    try {
+      await adminApi.setDriverStatus(token, account.id, status);
+      setAccounts((current) => current.map((item) => item.id === account.id ? { ...item, driverStatus: status } : item));
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Unable to update driver.'); }
+    finally { setSavingId(null); }
+  };
+
+  return <section className="space-y-4">
+    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div><h2 className="text-base font-bold text-gray-900">User & Driver Accounts</h2><p className="text-xs text-gray-500">Accounts registered in the M3 RIDE database</p></div>
+      <button type="button" onClick={() => void refresh()} disabled={loading} className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 disabled:opacity-50"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />Refresh</button>
+    </div>
+    {error && <p role="alert" className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700"><AlertCircle size={16} />{error}</p>}
+    <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full min-w-[680px] text-left text-xs">
+        <thead className="border-b bg-[#F7F8FA] text-[10px] uppercase text-gray-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Contact / Vehicle</th><th className="px-4 py-3">Joined</th><th className="px-4 py-3">Status / Action</th></tr></thead>
+        <tbody className="divide-y divide-gray-100">
+          {accounts.map((account) => <tr key={account.id}>
+            <td className="px-4 py-3"><span className="block font-bold text-gray-900">{account.name || account.email}</span><span className="text-gray-500">{account.email}</span></td>
+            <td className="px-4 py-3"><span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-semibold capitalize text-gray-700">{account.role === 'driver' ? <ShieldCheck size={12} /> : <UserRound size={12} />}{account.role}</span></td>
+            <td className="px-4 py-3 text-gray-600">{account.phone || '—'}{account.vehicleNumber && <span className="block font-mono">{account.vehicleType} · {account.vehicleNumber}</span>}</td>
+            <td className="px-4 py-3 text-gray-600">{new Date(account.createdAt).toLocaleDateString()}</td>
+            <td className="px-4 py-3">{account.role === 'driver' ? <div className="flex items-center gap-2"><span className="capitalize text-gray-600">{account.driverStatus || 'pending'}</span><button type="button" disabled={savingId === account.id} onClick={() => void updateDriver(account)} className={`rounded-lg px-2.5 py-1.5 font-bold text-white disabled:opacity-50 ${account.driverStatus === 'blocked' ? 'bg-green-600' : 'bg-red-600'}`}>{savingId === account.id ? 'Saving…' : account.driverStatus === 'blocked' ? 'Reactivate' : 'Block'}</button></div> : <span className="text-gray-400">Active</span>}</td>
+          </tr>)}
+          {!loading && !accounts.length && <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-500"><Users className="mx-auto mb-2" size={20} />No registered accounts yet.</td></tr>}
+          {loading && <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-500">Loading accounts…</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  </section>;
+}

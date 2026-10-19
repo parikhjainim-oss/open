@@ -100,6 +100,8 @@ npm start
 
 `npm run migrate` is idempotent and can also create the first administrator from `ADMIN_EMAIL` and `ADMIN_PASSWORD`. The API listens on port `4000` by default; `GET /api/health` confirms both the service and database are available.
 
+For a separate frontend and backend deployment, set the frontend build variable VITE_API_URL to the backend's public HTTPS URL and set backend CORS_ORIGINS to the frontend origin. The client defaults to its own origin when VITE_API_URL is omitted.
+
 ---
 
 ## 4. Environment Variables (`.env`)

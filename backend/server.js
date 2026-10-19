@@ -7,6 +7,9 @@ const app = express();
 
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,capacitor://localhost')
   .split(',').map((origin) => origin.trim()).filter(Boolean);
+// The production web client is hosted here. Keep it allowed even when the
+// backend's CORS_ORIGINS environment variable only lists local development URLs.
+if (!allowedOrigins.includes('https://open-skzo.onrender.com')) allowedOrigins.push('https://open-skzo.onrender.com');
 app.use(cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);

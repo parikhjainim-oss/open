@@ -27,21 +27,22 @@ import { AdminVerification } from './AdminVerification';
 import { AdminPricing } from './AdminPricing';
 import { AdminSubscriptions } from './AdminSubscriptions';
 import { AdminSupport } from './AdminSupport';
+import { AdminAccounts } from './AdminAccounts';
 
 type AdminTab =
   | 'overview'
   | 'live_ops'
   | 'rides'
   | 'captains'
+  | 'accounts'
   | 'verification'
   | 'pricing'
   | 'subscriptions'
   | 'support';
 
-export const AdminDashboard: React.FC = () => {
+export const AdminDashboard: React.FC<{ token: string; onLogout: () => void }> = ({ token, onLogout }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [state, setState] = useState<AppStoreState>(() => store.getState());
-  const [adminRole, setAdminRole] = useState<'Super Admin' | 'Operations Manager' | 'Verification Agent' | 'Support Agent'>('Super Admin');
 
   useEffect(() => {
     return store.subscribe((newState) => {
@@ -89,19 +90,9 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Admin Role Selector */}
-        <div className="px-4 py-3 bg-gray-900/60 border-b border-gray-800">
-          <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Active Role</span>
-          <select
-            value={adminRole}
-            onChange={(e) => setAdminRole(e.target.value as any)}
-            className="w-full bg-[#171717] text-xs font-semibold text-white px-2.5 py-1.5 rounded-lg border border-gray-700 outline-none"
-          >
-            <option>Super Admin</option>
-            <option>Operations Manager</option>
-            <option>Verification Agent</option>
-            <option>Support Agent</option>
-          </select>
+        <div className="border-b border-gray-800 bg-gray-900/60 px-4 py-3">
+          <span className="block text-[10px] font-bold uppercase text-gray-400">Signed in as</span>
+          <span className="text-xs font-semibold text-white">Administrator</span>
         </div>
 
         {/* Navigation Links */}
@@ -111,6 +102,7 @@ export const AdminDashboard: React.FC = () => {
             { id: 'live_ops', label: 'Live Operations Map', icon: MapPin },
             { id: 'rides', label: 'Rides Management', icon: Car, badge: activeRides > 0 ? `${activeRides} Active` : undefined },
             { id: 'captains', label: 'Captains & Fleet', icon: Users, badge: `${onlineCaptains} Online` },
+            { id: 'accounts', label: 'User Accounts', icon: Users },
             { id: 'verification', label: 'Verification Queue', icon: ShieldCheck, badge: pendingDocs > 0 ? `${pendingDocs} Pending` : undefined, badgeColor: 'bg-amber-500' },
             { id: 'pricing', label: 'Pricing & Service Areas', icon: Sliders },
             { id: 'subscriptions', label: 'Captain Subscriptions', icon: CreditCard },
@@ -176,13 +168,15 @@ export const AdminDashboard: React.FC = () => {
               <span>Reset Demo Seed Data</span>
             </button>
 
+            <button onClick={onLogout} className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">Sign out</button>
+
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <div className="w-8 h-8 rounded-full bg-[#171717] text-white flex items-center justify-center font-bold text-xs">
                 OP
               </div>
               <div className="text-left text-xs">
                 <span className="font-bold text-gray-900 block leading-tight">Ahmedabad Dispatch</span>
-                <span className="text-[10px] text-gray-500">{adminRole}</span>
+                <span className="text-[10px] text-gray-500">Administrator</span>
               </div>
             </div>
           </div>
@@ -343,6 +337,7 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'live_ops' && <AdminLiveMap />}
           {activeTab === 'rides' && <AdminRides />}
           {activeTab === 'captains' && <AdminCaptains />}
+          {activeTab === 'accounts' && <AdminAccounts token={token} />}
           {activeTab === 'verification' && <AdminVerification />}
           {activeTab === 'pricing' && <AdminPricing />}
           {activeTab === 'subscriptions' && <AdminSubscriptions />}
