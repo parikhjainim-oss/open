@@ -18,7 +18,8 @@ import {
   Filter,
   Eye,
   Sliders,
-  DollarSign
+  DollarSign,
+  UserRound,
 } from 'lucide-react';
 import { AdminLiveMap } from './AdminLiveMap';
 import { AdminRides } from './AdminRides';
@@ -28,6 +29,7 @@ import { AdminPricing } from './AdminPricing';
 import { AdminSubscriptions } from './AdminSubscriptions';
 import { AdminSupport } from './AdminSupport';
 import { AdminAccounts } from './AdminAccounts';
+import { AdminProfile } from './AdminProfile';
 
 type AdminTab =
   | 'overview'
@@ -35,12 +37,13 @@ type AdminTab =
   | 'rides'
   | 'captains'
   | 'accounts'
+  | 'profile'
   | 'verification'
   | 'pricing'
   | 'subscriptions'
   | 'support';
 
-export const AdminDashboard: React.FC<{ token: string; accountEmail: string; onLogout: () => void }> = ({ token, accountEmail, onLogout }) => {
+export const AdminDashboard: React.FC<{ token: string; accountEmail: string; userId: string; onLogout: () => void }> = ({ token, accountEmail, userId, onLogout }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [state, setState] = useState<AppStoreState>(() => store.getState());
 
@@ -103,6 +106,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; onL
             { id: 'rides', label: 'Rides Management', icon: Car, badge: activeRides > 0 ? `${activeRides} Active` : undefined },
             { id: 'captains', label: 'Captains & Fleet', icon: Users, badge: `${onlineCaptains} Online` },
             { id: 'accounts', label: 'User Accounts', icon: Users },
+            { id: 'profile', label: 'Admin Profile', icon: UserRound },
             { id: 'verification', label: 'Verification Queue', icon: ShieldCheck, badge: pendingDocs > 0 ? `${pendingDocs} Pending` : undefined, badgeColor: 'bg-amber-500' },
             { id: 'pricing', label: 'Pricing & Service Areas', icon: Sliders },
             { id: 'subscriptions', label: 'Captain Subscriptions', icon: CreditCard },
@@ -168,7 +172,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; onL
               <span>Reset Demo Seed Data</span>
             </button>
 
-            <button onClick={onLogout} className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">Sign out</button>
+            <button onClick={() => setActiveTab('profile')} className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">My profile</button>
 
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <div className="w-8 h-8 rounded-full bg-[#171717] text-white flex items-center justify-center font-bold text-xs">
@@ -338,6 +342,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; onL
           {activeTab === 'rides' && <AdminRides />}
           {activeTab === 'captains' && <AdminCaptains />}
           {activeTab === 'accounts' && <AdminAccounts token={token} />}
+          {activeTab === 'profile' && <AdminProfile email={accountEmail} accountId={userId} onLogout={onLogout} />}
           {activeTab === 'verification' && <AdminVerification />}
           {activeTab === 'pricing' && <AdminPricing />}
           {activeTab === 'subscriptions' && <AdminSubscriptions />}
