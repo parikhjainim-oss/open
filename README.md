@@ -104,7 +104,7 @@ For a separate frontend and backend deployment, set the frontend build variable 
 
 ### Deploying the full app on Render
 
-Use the root `render.yaml` as a **Node web service** so one HTTPS origin serves both the React app and `/api`. The Blueprint requires an existing PostgreSQL connection string in `DATABASE_URL`, plus `ADMIN_EMAIL` and `ADMIN_PASSWORD` for the initial administrator. It runs the idempotent database migration at service start. Set a strong unique admin password in Render; do not commit it to the repository. The existing static-only Render service cannot run this API; deploy the Node web service and use its URL for the app.
+Use the root `render.yaml` as a **Node web service** so one HTTPS origin serves both the React app and `/api`. The Blueprint requires an existing PostgreSQL connection string in `DATABASE_URL`, plus `ADMIN_EMAIL` and `ADMIN_PASSWORD` for the initial administrator. It runs the idempotent database migration at service start. Set a strong unique admin password in Render; do not commit it to the repository. The existing static-only Render service at `open-5lna.onrender.com` cannot run this API. Deploy the Node web service defined here and open its `open-5lna-app.onrender.com` URL; the app and API then use the same host.
 
 ---
 

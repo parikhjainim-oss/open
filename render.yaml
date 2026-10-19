@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: open-skzo-app
+    name: open-5lna-app
     runtime: node
     plan: free
     buildCommand: npm ci && npm --prefix backend ci && npm run build
@@ -22,4 +22,4 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: CORS_ORIGINS
-        value: https://open-skzo.onrender.com
+        value: https://open-5lna.onrender.com,https://open-skzo.onrender.com
