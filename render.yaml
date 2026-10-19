@@ -1,25 +1,47 @@
-services:
-  - type: web
-    name: open-5lna-app
-    runtime: node
-    plan: free
-    buildCommand: npm ci && npm --prefix backend ci && npm run build
-    startCommand: npm start
-    healthCheckPath: /api/health
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_SSL
-        value: "true"
-      - key: VITE_API_URL
-        value: ""
-      - key: JWT_SECRET
-        generateValue: true
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: CORS_ORIGINS
-        value: https://open-5lna.onrender.com,https://open-skzo.onrender.com
+version: "1"
+projects:
+  - name: M3 ride
+    environments:
+      - name: Production
+        services:
+          # Keep the existing frontend as a static site and point its build at
+          # the public URL of the API service below.
+          - type: web
+            name: open
+            runtime: static
+            repo: https://github.com/parikhjainim-oss/open
+            buildCommand: npm ci && npm run build
+            staticPublishPath: ./dist
+            autoDeployTrigger: commit
+            envVars:
+              - key: VITE_API_URL
+                fromService:
+                  type: web
+                  name: open-api
+                  envVarKey: RENDER_EXTERNAL_URL
+
+          - type: web
+            name: open-api
+            runtime: node
+            repo: https://github.com/parikhjainim-oss/open
+            rootDir: backend
+            plan: free
+            buildCommand: npm ci
+            startCommand: npm run migrate && npm start
+            healthCheckPath: /api/health
+            autoDeployTrigger: commit
+            envVars:
+              - key: NODE_ENV
+                value: production
+              - key: DATABASE_URL
+                sync: false
+              - key: DATABASE_SSL
+                value: "true"
+              - key: JWT_SECRET
+                generateValue: true
+              - key: ADMIN_EMAIL
+                sync: false
+              - key: ADMIN_PASSWORD
+                sync: false
+              - key: CORS_ORIGINS
+                value: https://open-5lna.onrender.com
