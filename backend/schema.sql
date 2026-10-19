@@ -10,10 +10,6 @@ CREATE TABLE users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Seed a default admin (password: admin123 – you should change it)
-INSERT INTO users (email, password_hash, role)
-VALUES (
-    'admin@example.com',
-    crypt('admin123', gen_salt('bf')),
-    'admin'
-);
+-- Admin credentials will be provided via environment variables during deployment.
+-- Example: a separate seed script reads ADMIN_EMAIL and ADMIN_PASSWORD from .env and runs:
+-- INSERT INTO users (email, password_hash, role) VALUES (ADMIN_EMAIL, crypt(ADMIN_PASSWORD, gen_salt('bf')), 'admin');
