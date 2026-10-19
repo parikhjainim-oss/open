@@ -1,4 +1,3 @@
-// backend/server.js - Main entry point
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -6,28 +5,48 @@ const { pool } = require('./db');
 
 const app = express();
 
-// ---------- CORS ----------
-// Allow the web app (VITE_API_URL origin) and Capacitor app (file:// protocol)
-const allowedOrigins = [
-  process.env.CORS_ORIGIN_WEB || '*', // e.g., https://myapp.example.com
-  'capacitor://localhost',
-  'http://localhost', // dev
-];
-app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,capacitor://localhost')
+  .split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS.'));
+  },
+  credentials: true,
+}));
+app.use(express.json({ limit: '100kb' }));
 
 // ---------- Import routes ----------
 const authRoutes = require('./routes/auth');
 const driverRoutes = require('./routes/driver');
 const adminRoutes = require('./routes/admin');
-const { authenticate } = require('./middleware/auth');
+const { authenticate, getJwtSecret } = require('./middleware/auth');
+
+getJwtSecret();
 
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', authenticate, driverRoutes);
 app.use('/api/admin', authenticate, adminRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', async (_req, res, next) => {
+  try {
+    await pool.query('SELECT 1');
+    return res.json({ status: 'ok' });
+  } catch (error) { return next(error); }
+});
+
+app.use((_req, res) => res.status(404).json({ message: 'Route not found.' }));
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  const status = error.type === 'entity.parse.failed' ? 400 : 500;
+  res.status(status).json({ message: status === 400 ? 'Malformed JSON request body.' : 'Internal server error.' });
+});
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+function shutdown(signal) {
+  console.log(`${signal} received; shutting down.`);
+  server.close(() => pool.end().finally(() => process.exit(0)));
+}
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));

@@ -85,6 +85,21 @@ Executes 18 automated tests covering:
 - Captain subscription renewals.
 - Admin KYC verification queue operations.
 
+### Backend and PostgreSQL
+
+The frontend is currently a self-contained simulation backed by browser storage. The production-ready API lives in `backend` and uses PostgreSQL for accounts, driver profiles, pricing, rides, and ride audit events.
+
+```bash
+cd backend
+npm install
+copy .env.example .env
+# Set DATABASE_URL and a unique JWT_SECRET (at least 32 characters) in .env
+npm run migrate
+npm start
+```
+
+`npm run migrate` is idempotent and can also create the first administrator from `ADMIN_EMAIL` and `ADMIN_PASSWORD`. The API listens on port `4000` by default; `GET /api/health` confirms both the service and database are available.
+
 ---
 
 ## 4. Environment Variables (`.env`)

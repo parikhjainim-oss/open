@@ -1,18 +1,22 @@
 // backend/middleware/auth.js
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+function getJwtSecret() {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) throw new Error('JWT_SECRET must be at least 32 characters long.');
+  return process.env.JWT_SECRET;
+}
 
 function authenticate(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ msg: 'No token provided' });
-  const token = authHeader.split(' ')[1];
+  const [scheme, token] = (req.headers.authorization || '').split(' ');
+  if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'A Bearer token is required.' });
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload; // { id, role }
-    next();
-  } catch (err) {
-    return res.status(401).json({ msg: 'Invalid token' });
+    req.user = jwt.verify(token, getJwtSecret());
+    return next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid or expired token.' });
   }
 }
 
-module.exports = { authenticate };
+function requireRole(...roles) {
+  return (req, res, next) => roles.includes(req.user.role) ? next() : res.status(403).json({ message: 'Forbidden.' });
+}
+module.exports = { authenticate, getJwtSecret, requireRole };

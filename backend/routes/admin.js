@@ -1,45 +1,25 @@
-// backend/routes/admin.js
 const express = require('express');
 const { pool } = require('../db');
+const { requireRole } = require('../middleware/auth');
+
 const router = express.Router();
+router.use(requireRole('admin'));
 
-// Middleware: only admin users may access these routes
-function adminOnly(req, res, next) {
-  if (!req.user) return res.status(401).json({ msg: 'No token' });
-  if (req.user.role !== 'admin') return res.status(403).json({ msg: 'Forbidden' });
-  next();
-}
-
-// List all riders and drivers (excluding admins)
-router.get('/users', adminOnly, async (req, res) => {
+router.get('/users', async (_req, res, next) => {
   try {
-    const result = await pool.query(
-      "SELECT id, email, role, extra_data FROM users WHERE role IN ('rider', 'driver') ORDER BY id"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
-  }
+    const result = await pool.query(`SELECT u.id, u.email, u.role, u.created_at AS "createdAt", d.name, d.phone, d.vehicle_type AS "vehicleType", d.vehicle_number AS "vehicleNumber", d.status AS "driverStatus" FROM users u LEFT JOIN driver_profiles d ON d.user_id = u.id WHERE u.role IN ('rider', 'driver') ORDER BY u.created_at DESC`);
+    return res.json(result.rows);
+  } catch (error) { return next(error); }
 });
 
-// Approve or block a driver (status stored in extra_data.driver_status)
-router.patch('/drivers/:id/status', adminOnly, async (req, res) => {
-  const driverId = req.params.id;
-  const { status } = req.body; // expected: 'approved' or 'blocked'
-  if (!['approved', 'blocked'].includes(status)) {
-    return res.status(400).json({ msg: "Status must be 'approved' or 'blocked'" });
-  }
+router.patch('/drivers/:id/status', async (req, res, next) => {
+  const { status } = req.body || {};
+  if (!['approved', 'blocked'].includes(status)) return res.status(400).json({ message: "Status must be 'approved' or 'blocked'." });
   try {
-    await pool.query(
-      "UPDATE users SET extra_data = jsonb_set(extra_data, '{driver_status}', to_jsonb($1::text)) WHERE id = $2 AND role = 'driver'",
-      [status, driverId]
-    );
-    res.json({ msg: `Driver ${driverId} status set to ${status}` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
-  }
+    const result = await pool.query('UPDATE driver_profiles SET status = $1, updated_at = NOW() WHERE user_id = $2 RETURNING user_id AS id, status', [status, req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ message: 'Driver not found.' });
+    return res.json(result.rows[0]);
+  } catch (error) { return next(error); }
 });
 
 module.exports = router;
