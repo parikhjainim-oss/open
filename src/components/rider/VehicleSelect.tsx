@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
 import { Header } from '../common/Header';
 import { VectorMap } from '../maps/VectorMap';
-import { LocationPoint, VehicleCategory } from '../../types';
+import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
 import { store } from '../../services/store';
 import { Verified, Receipt, ChevronDown, ArrowRight, Check, ShieldCheck, Wallet, Sparkles } from 'lucide-react';
 
 interface VehicleSelectProps {
   pickup: LocationPoint;
   drop: LocationPoint;
+  serviceType?: RideServiceType;
+  serviceDetails?: string;
   onBack: () => void;
-  onConfirmBooking: (category: VehicleCategory, paymentMethod: 'Google Pay / UPI' | 'Cash' | 'M3 Wallet') => void;
+  onConfirmBooking: (category: VehicleCategory, paymentMethod: 'Google Pay / UPI' | 'Cash' | 'M3 Wallet', distanceKm: number, durationMins: number) => void;
 }
 
 export const VehicleSelect: React.FC<VehicleSelectProps> = ({
   pickup,
   drop,
+  serviceType = 'city',
+  serviceDetails,
   onBack,
   onConfirmBooking
 }) => {
@@ -24,9 +28,12 @@ export const VehicleSelect: React.FC<VehicleSelectProps> = ({
   const [appliedPromo, setAppliedPromo] = useState('WELCOME_AMD');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Dynamic calculation for Ahmedabad distance
-  const distanceKm = 8.4;
-  const durationMins = 22;
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const deltaLat = radians(drop.lat - pickup.lat);
+  const deltaLng = radians(drop.lng - pickup.lng);
+  const haversine = Math.sin(deltaLat / 2) ** 2 + Math.cos(radians(pickup.lat)) * Math.cos(radians(drop.lat)) * Math.sin(deltaLng / 2) ** 2;
+  const distanceKm = Math.max(1, Math.round(6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)) * 1.25 * 10) / 10);
+  const durationMins = Math.max(8, Math.round(distanceKm / (distanceKm > 35 ? 42 : 22) * 60 + 5));
 
   const pricing = store.getState().pricing;
 
@@ -44,7 +51,7 @@ export const VehicleSelect: React.FC<VehicleSelectProps> = ({
   const handleBooking = () => {
     setIsSubmitting(true);
     setTimeout(() => {
-      onConfirmBooking(selectedCategory, paymentMethod);
+      onConfirmBooking(selectedCategory, paymentMethod, distanceKm, durationMins);
       setIsSubmitting(false);
     }, 600);
   };
@@ -62,7 +69,7 @@ export const VehicleSelect: React.FC<VehicleSelectProps> = ({
         <VectorMap
           mode="route"
           height="h-72"
-          etaText="8.4 km • 22 mins via Relief Rd"
+          etaText={`${distanceKm} km · ${durationMins} mins estimated`}
           trafficStatus="Moderate Traffic"
         />
 
@@ -74,7 +81,7 @@ export const VehicleSelect: React.FC<VehicleSelectProps> = ({
           {/* Sheet Header & Curated Ahmedabad Pickup Guidance */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Choose a ride</h2>
+              <div><h2 className="text-lg font-bold text-gray-900">{serviceType === 'parcel' ? 'Choose a delivery ride' : serviceType === 'travel' ? 'Choose your intercity ride' : serviceType === 'pro' ? 'Choose an M3 Pro ride' : 'Choose a ride'}</h2>{serviceDetails && <p className="mt-0.5 text-xs text-gray-500">Parcel: {serviceDetails}</p>}</div>
               <span className="bg-[#F0F3FF] text-gray-700 text-xs px-2.5 py-0.5 rounded-full flex items-center gap-1 font-semibold border border-blue-100">
                 <Verified className="w-3.5 h-3.5 text-[#0053DB]" /> Verified Captains
               </span>
@@ -89,6 +96,7 @@ export const VehicleSelect: React.FC<VehicleSelectProps> = ({
                 <strong className="text-gray-900">Pickup Spot:</strong> {pickup.name} ({pickup.landmark || pickup.address})
               </p>
             </div>
+            <a href={`https://www.google.com/maps/dir/?api=1&origin=${pickup.lat},${pickup.lng}&destination=${drop.lat},${drop.lng}&travelmode=driving`} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-[#0053DB] hover:bg-blue-50">View live route in Google Maps <ArrowRight size={14} /></a>
           </div>
 
           {/* Ride Options Selection Roster */}

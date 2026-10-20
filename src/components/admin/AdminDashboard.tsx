@@ -20,6 +20,9 @@ import {
   Sliders,
   DollarSign,
   UserRound,
+  Menu,
+  X,
+  LogOut,
 } from 'lucide-react';
 import { AdminLiveMap } from './AdminLiveMap';
 import { AdminRides } from './AdminRides';
@@ -30,6 +33,7 @@ import { AdminSubscriptions } from './AdminSubscriptions';
 import { AdminSupport } from './AdminSupport';
 import { AdminAccounts } from './AdminAccounts';
 import { AdminProfile } from './AdminProfile';
+import type { AuthUser } from '../../services/api';
 
 type AdminTab =
   | 'overview'
@@ -43,8 +47,9 @@ type AdminTab =
   | 'subscriptions'
   | 'support';
 
-export const AdminDashboard: React.FC<{ token: string; accountEmail: string; accountName?: string; accountPhone?: string | null; userId: string; onLogout: () => void }> = ({ token, accountEmail, accountName, accountPhone, userId, onLogout }) => {
+export const AdminDashboard: React.FC<{ token: string; accountEmail: string; accountName?: string; accountPhone?: string | null; accountRole?: string; account?: AuthUser; onAccountUpdated?: (account: AuthUser) => void; userId: string; onLogout: () => void }> = ({ token, accountEmail, accountName, accountPhone, accountRole = 'operations_manager', account, onAccountUpdated, userId, onLogout }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [state, setState] = useState<AppStoreState>(() => store.getState());
 
   useEffect(() => {
@@ -73,11 +78,20 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
 
   const platformRevenue = Math.round(grossBookingValue * 0.05) + (completedRides * 3);
   const subscriptionRevenue = state.plans.reduce((sum, p) => sum + p.price * p.activeSubscribers, 0);
+  const allowedTabs: Record<string, AdminTab[]> = {
+    super_admin: ['overview', 'live_ops', 'rides', 'captains', 'accounts', 'profile', 'verification', 'pricing', 'subscriptions', 'support'],
+    operations_manager: ['overview', 'live_ops', 'rides', 'captains', 'accounts', 'profile', 'pricing', 'subscriptions', 'support'],
+    verification_agent: ['overview', 'accounts', 'profile', 'verification'],
+    support_agent: ['overview', 'rides', 'profile', 'support'],
+  };
+  const permittedTabs = allowedTabs[accountRole] || allowedTabs.operations_manager;
+  const roleLabel = accountRole.replaceAll('_', ' ');
+  useEffect(() => { if (!permittedTabs.includes(activeTab)) setActiveTab(permittedTabs[0]); }, [accountRole]);
 
   return (
     <div className="flex min-h-screen bg-[#F7F8FA] text-gray-900 font-sans">
       {/* Sidebar Navigation */}
-      <aside className="w-64 bg-[#171717] text-white flex flex-col shrink-0 border-r border-gray-800">
+      {sidebarOpen && <aside className="w-64 bg-[#171717] text-white flex flex-col shrink-0 border-r border-gray-800">
         {/* Brand header */}
         <div className="p-5 border-b border-gray-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -95,7 +109,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
 
         <div className="border-b border-gray-800 bg-gray-900/60 px-4 py-3">
           <span className="block text-[10px] font-bold uppercase text-gray-400">Signed in as</span>
-          <span className="text-xs font-semibold text-white">Administrator</span>
+          <span className="text-xs font-semibold capitalize text-white">{roleLabel}</span>
         </div>
 
         {/* Navigation Links */}
@@ -111,7 +125,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
             { id: 'pricing', label: 'Pricing & Service Areas', icon: Sliders },
             { id: 'subscriptions', label: 'Captain Subscriptions', icon: CreditCard },
             { id: 'support', label: 'Support & Safety Incidents', icon: HelpCircle, badge: openTickets > 0 ? `${openTickets} Open` : undefined, badgeColor: 'bg-red-500' }
-          ].map((item) => {
+          ].filter((item) => permittedTabs.includes(item.id as AdminTab)).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
@@ -148,13 +162,14 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
           <p>M3 RIDE Platform v2.4</p>
           <p className="text-gray-400">Ahmedabad, Gujarat</p>
         </div>
-      </aside>
+      </aside>}
 
       {/* Main Dashboard Canvas */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top Navbar */}
         <header className="h-16 px-6 bg-white border-b border-gray-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen ? 'Close admin menu' : 'Open admin menu'} className="rounded-lg bg-gray-100 p-2 text-gray-700 hover:bg-gray-200">{sidebarOpen ? <X size={18} /> : <Menu size={18} />}</button>
             <h1 className="text-lg font-bold text-gray-900 capitalize">
               {activeTab.replace('_', ' ')}
             </h1>
@@ -164,15 +179,16 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            {accountRole === 'super_admin' && <button
               onClick={() => store.resetToSeed()}
               className="text-xs text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Reset Demo Seed Data</span>
-            </button>
+            </button>}
 
             <button onClick={() => setActiveTab('profile')} className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">My profile</button>
+            <button onClick={onLogout} className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-gray-700"><LogOut size={14} />Sign out</button>
 
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <div className="w-8 h-8 rounded-full bg-[#171717] text-white flex items-center justify-center font-bold text-xs">
@@ -180,7 +196,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
               </div>
               <div className="text-left text-xs">
                 <span className="font-bold text-gray-900 block leading-tight">{accountEmail}</span>
-                <span className="text-[10px] text-gray-500">Administrator</span>
+                <span className="text-[10px] capitalize text-gray-500">{roleLabel}</span>
               </div>
             </div>
           </div>
@@ -341,8 +357,8 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; acc
           {activeTab === 'live_ops' && <AdminLiveMap />}
           {activeTab === 'rides' && <AdminRides />}
           {activeTab === 'captains' && <AdminCaptains />}
-          {activeTab === 'accounts' && <AdminAccounts token={token} />}
-          {activeTab === 'profile' && <AdminProfile email={accountEmail} name={accountName} phone={accountPhone} accountId={userId} onLogout={onLogout} />}
+          {activeTab === 'accounts' && <AdminAccounts token={token} canCreateAdmins={accountRole === 'super_admin'} />}
+          {activeTab === 'profile' && <AdminProfile email={accountEmail} name={accountName} phone={accountPhone} adminRole={accountRole} accountId={userId} account={account} onAccountUpdated={onAccountUpdated} onLogout={onLogout} />}
           {activeTab === 'verification' && <AdminVerification />}
           {activeTab === 'pricing' && <AdminPricing />}
           {activeTab === 'subscriptions' && <AdminSubscriptions />}

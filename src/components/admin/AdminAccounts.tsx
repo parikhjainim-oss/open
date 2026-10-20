@@ -3,13 +3,14 @@ import type { FormEvent } from 'react';
 import { AlertCircle, RefreshCw, ShieldCheck, UserRound, Users } from 'lucide-react';
 import { adminApi, AdminAccount } from '../../services/api';
 
-export function AdminAccounts({ token }: { token: string }) {
+export function AdminAccounts({ token, canCreateAdmins = false }: { token: string; canCreateAdmins?: boolean }) {
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [adminRole, setAdminRole] = useState<'super_admin' | 'operations_manager' | 'verification_agent' | 'support_agent'>('operations_manager');
   const [creatingAdmin, setCreatingAdmin] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -40,7 +41,7 @@ export function AdminAccounts({ token }: { token: string }) {
     setError('');
     setSuccess('');
     try {
-      await adminApi.createAdmin(token, { email: adminEmail, password: adminPassword });
+      await adminApi.createAdmin(token, { email: adminEmail, password: adminPassword, adminRole });
       setAdminEmail('');
       setAdminPassword('');
       setSuccess('Administrator account created.');
@@ -57,18 +58,19 @@ export function AdminAccounts({ token }: { token: string }) {
     </div>
     {error && <p role="alert" className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700"><AlertCircle size={16} />{error}</p>}
     {success && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-700">{success}</p>}
-    <form onSubmit={createAdmin} className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    {canCreateAdmins && <form onSubmit={createAdmin} className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
       <label className="text-xs font-semibold text-gray-700">New admin email<input required type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 p-2.5 text-sm" placeholder="admin@example.com" /></label>
       <label className="text-xs font-semibold text-gray-700">Temporary password<input required minLength={12} type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 p-2.5 text-sm" placeholder="At least 12 characters" /></label>
+      <label className="text-xs font-semibold text-gray-700">Access role<select value={adminRole} onChange={(event) => setAdminRole(event.target.value as typeof adminRole)} className="mt-1 block w-full rounded-xl border border-gray-200 p-2.5 text-sm"><option value="super_admin">Super Admin</option><option value="operations_manager">Operations Manager</option><option value="verification_agent">Verification Agent</option><option value="support_agent">Support Agent</option></select></label>
       <button type="submit" disabled={creatingAdmin} className="rounded-xl bg-[#FF6B00] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{creatingAdmin ? 'Creating…' : 'Create admin'}</button>
-    </form>
+    </form>}
     <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
       <table className="w-full min-w-[680px] text-left text-xs">
         <thead className="border-b bg-[#F7F8FA] text-[10px] uppercase text-gray-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Contact / Vehicle</th><th className="px-4 py-3">Joined</th><th className="px-4 py-3">Status / Action</th></tr></thead>
         <tbody className="divide-y divide-gray-100">
           {accounts.map((account) => <tr key={account.id}>
             <td className="px-4 py-3"><span className="block font-bold text-gray-900">{account.name || account.email}</span><span className="text-gray-500">{account.email}</span></td>
-            <td className="px-4 py-3"><span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-semibold capitalize text-gray-700">{account.role === 'driver' ? <ShieldCheck size={12} /> : <UserRound size={12} />}{account.role}</span></td>
+            <td className="px-4 py-3"><span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-semibold capitalize text-gray-700">{account.role === 'driver' || account.role === 'admin' ? <ShieldCheck size={12} /> : <UserRound size={12} />}{account.role === 'admin' ? account.adminRole?.replaceAll('_', ' ') || 'admin' : account.role}</span></td>
             <td className="px-4 py-3 text-gray-600">{account.phone || '—'}{account.vehicleNumber && <span className="block font-mono">{account.vehicleType} · {account.vehicleNumber}</span>}</td>
             <td className="px-4 py-3 text-gray-600">{new Date(account.createdAt).toLocaleDateString()}</td>
             <td className="px-4 py-3">{account.role === 'driver' ? <div className="flex items-center gap-2"><span className="capitalize text-gray-600">{account.driverStatus || 'pending'}</span><button type="button" disabled={savingId === account.id} onClick={() => void updateDriver(account)} className={`rounded-lg px-2.5 py-1.5 font-bold text-white disabled:opacity-50 ${account.driverStatus === 'blocked' ? 'bg-green-600' : 'bg-red-600'}`}>{savingId === account.id ? 'Saving…' : account.driverStatus === 'blocked' ? 'Reactivate' : 'Block'}</button></div> : <span className="text-gray-400">Active</span>}</td>

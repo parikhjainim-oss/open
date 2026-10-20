@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { store } from './services/store';
-import { UserRole, LocationPoint, VehicleCategory, Ride } from './types';
+import { UserRole, LocationPoint, RideServiceType, VehicleCategory, Ride } from './types';
 import { RiderHome } from './components/rider/RiderHome';
 import { VehicleSelect } from './components/rider/VehicleSelect';
 import { LiveTripTracking } from './components/rider/LiveTripTracking';
@@ -35,6 +35,8 @@ export default function App() {
   const [riderScreen, setRiderScreen] = useState<'home' | 'vehicle_select' | 'tracking' | 'activity' | 'wallet' | 'profile'>('home');
   const [bookingParams, setBookingParams] = useState<{
     category: VehicleCategory;
+    serviceType: RideServiceType;
+    serviceDetails?: string;
     pickup: LocationPoint;
     drop: LocationPoint;
   } | null>(null);
@@ -63,6 +65,13 @@ export default function App() {
     const nextRole: UserRole = nextSession.user.role === 'driver' ? 'captain' : nextSession.user.role;
     setRole(nextRole);
     store.setRole(nextRole);
+    if (nextSession.user.role === 'rider' && nextSession.user.rider) store.updateRiderAccount({
+      id: nextSession.user.id,
+      name: nextSession.user.rider.name,
+      phone: nextSession.user.rider.phone || '',
+      email: nextSession.user.email,
+      avatar: nextSession.user.photo || store.getState().rider.avatar,
+    });
     setRiderScreen('home');
     setCaptainScreen('home');
     setBookingParams(null);
@@ -89,14 +98,15 @@ export default function App() {
             {riderScreen === 'home' && (
               <RiderHome
                 activeTab="home"
-                onSelectRideFlow={(category, pickup, drop) => {
-                  setBookingParams({ category, pickup, drop });
+                onSelectRideFlow={(category, pickup, drop, serviceType, serviceDetails) => {
+                  setBookingParams({ category, pickup, drop, serviceType, serviceDetails });
                   setRiderScreen('vehicle_select');
                 }}
                 onOpenActivity={() => setRiderScreen('activity')}
                 onOpenWallet={() => setRiderScreen('wallet')}
                 onOpenProfile={() => setRiderScreen('profile')}
                 displayName={session.user.rider?.name}
+                displayPhoto={session.user.photo}
               />
             )}
 
@@ -104,14 +114,18 @@ export default function App() {
               <VehicleSelect
                 pickup={bookingParams.pickup}
                 drop={bookingParams.drop}
+                serviceType={bookingParams.serviceType}
+                serviceDetails={bookingParams.serviceDetails}
                 onBack={() => setRiderScreen('home')}
-                onConfirmBooking={(category, paymentMethod) => {
+                onConfirmBooking={(category, paymentMethod, distanceKm, durationMins) => {
                   const newRide = store.requestRide({
                     category,
+                    serviceType: bookingParams.serviceType,
+                    serviceDetails: bookingParams.serviceDetails,
                     pickup: bookingParams.pickup,
                     drop: bookingParams.drop,
-                    distanceKm: 8.4,
-                    durationMins: 22,
+                    distanceKm,
+                    durationMins,
                     paymentMethod,
                     promoCode: 'WELCOME_AMD'
                   });
@@ -142,7 +156,7 @@ export default function App() {
             )}
 
             {riderScreen === 'profile' && (
-              <RiderProfile account={session.user} onBack={() => setRiderScreen('home')} onLogout={handleLogout} />
+              <RiderProfile account={session.user} onBack={() => setRiderScreen('home')} onLogout={handleLogout} onAccountUpdated={(user) => { setSession({ ...session, user }); if (user.rider) store.updateRiderAccount({ name: user.rider.name, phone: user.rider.phone || '', email: user.email, avatar: user.photo || store.getState().rider.avatar }); }} />
             )}
 
             {completedRide && (
@@ -170,6 +184,7 @@ export default function App() {
                 onOpenProfile={() => setCaptainScreen('profile')}
                 displayName={session.user.driver?.name || 'Driver'}
                 displayVehicleNumber={session.user.driver?.vehicleNumber || 'Not added'}
+                displayPhoto={session.user.photo}
               />
             )}
 
@@ -192,13 +207,13 @@ export default function App() {
             )}
 
             {captainScreen === 'profile' && (
-              <CaptainProfile account={session.user} onBack={() => setCaptainScreen('home')} onLogout={handleLogout} />
+              <CaptainProfile account={session.user} onBack={() => setCaptainScreen('home')} onLogout={handleLogout} onAccountUpdated={(user) => setSession({ ...session, user })} />
             )}
           </div>
         )}
 
         {/* ADMIN DASHBOARD */}
-        {role === 'admin' && session && <AdminDashboard token={session.token} accountEmail={session.user.email} accountName={session.user.name} accountPhone={session.user.phone} userId={session.user.id} onLogout={handleLogout} />}
+        {role === 'admin' && session && <AdminDashboard token={session.token} accountEmail={session.user.email} accountName={session.user.name} accountPhone={session.user.phone} accountRole={session.user.adminRole} account={session.user} onAccountUpdated={(user) => setSession({ ...session, user })} userId={session.user.id} onLogout={handleLogout} />}
 
         {/* DUAL SCREEN SPLIT VIEW */}
         {role === 'split' && <SplitSimulation />}

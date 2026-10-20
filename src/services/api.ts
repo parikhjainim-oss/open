@@ -6,8 +6,14 @@ export interface AuthUser {
   role: AccountRole;
   name?: string;
   phone?: string | null;
+  photo?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  emergencyContact?: string;
+  homeAddress?: string;
+  adminRole?: 'super_admin' | 'operations_manager' | 'verification_agent' | 'support_agent';
   rider?: { name: string; phone?: string | null } | null;
-  driver?: { name: string; phone?: string | null; vehicleType?: string; vehicleNumber?: string; status?: string } | null;
+  driver?: { name: string; phone?: string | null; vehicleType?: string; vehicleNumber?: string; licenceNumber?: string; status?: string } | null;
 }
 
 export interface AuthSession { token: string; user: AuthUser; }
@@ -57,10 +63,16 @@ function normalizeAuthUser(value: unknown, fallback: JsonObject[] = []): AuthUse
   const phone = profile?.phone ?? profile?.phoneNumber ?? profile?.phone_number;
   const id = user.id ?? user.userId ?? user.user_id ?? user.sub ?? email;
   const authUser: AuthUser = { id: String(id), email, role };
+  if (typeof user.photo === 'string') authUser.photo = user.photo;
+  if (typeof user.gender === 'string') authUser.gender = user.gender;
+  if (typeof user.dateOfBirth === 'string') authUser.dateOfBirth = user.dateOfBirth;
+  if (typeof user.emergencyContact === 'string') authUser.emergencyContact = user.emergencyContact;
+  if (typeof user.homeAddress === 'string') authUser.homeAddress = user.homeAddress;
   if (role === 'admin') {
     const adminProfile = asObject(user.profile);
     if (typeof (user.name ?? adminProfile?.name) === 'string') authUser.name = String(user.name ?? adminProfile?.name);
     if (typeof (user.phone ?? adminProfile?.phone) === 'string') authUser.phone = String(user.phone ?? adminProfile?.phone);
+    if (['super_admin', 'operations_manager', 'verification_agent', 'support_agent'].includes(String(user.adminRole))) authUser.adminRole = user.adminRole as AuthUser['adminRole'];
   }
 
   if (role === 'rider') authUser.rider = profile ? {
@@ -72,6 +84,7 @@ function normalizeAuthUser(value: unknown, fallback: JsonObject[] = []): AuthUse
     phone: typeof phone === 'string' ? phone : null,
     vehicleType: typeof (profile.vehicleType ?? profile.vehicle_type) === 'string' ? String(profile.vehicleType ?? profile.vehicle_type) : undefined,
     vehicleNumber: typeof (profile.vehicleNumber ?? profile.vehicle_number) === 'string' ? String(profile.vehicleNumber ?? profile.vehicle_number) : undefined,
+    licenceNumber: typeof (profile.licenceNumber ?? profile.licence_number) === 'string' ? String(profile.licenceNumber ?? profile.licence_number) : undefined,
     status: typeof profile.status === 'string' ? profile.status : undefined,
   } : null;
   return authUser;
@@ -110,7 +123,8 @@ async function authenticate(path: string, payload: Record<string, unknown>): Pro
 const API_URL = (import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000')).replace(/\/$/, '');
 const SESSION_KEY = 'm3_ride_auth_session';
 const ACCOUNTS_KEY = 'm3_ride_accounts';
-const USE_REMOTE_AUTH = import.meta.env.VITE_AUTH_MODE === 'api';
+export const USE_REMOTE_AUTH = import.meta.env.VITE_AUTH_MODE === 'api';
+const AUTH_MODE = USE_REMOTE_AUTH ? 'api' : 'local';
 
 type StoredAccount = { user: AuthUser; salt: string; passwordHash: string; createdAt: string };
 const readAccounts = (): StoredAccount[] => {
@@ -127,10 +141,10 @@ async function passwordDigest(password: string, salt: string) {
   return bytesToHex(new Uint8Array(bits));
 }
 const localSession = (user: AuthUser): AuthSession => ({ token: `local-${crypto.randomUUID?.() || Date.now().toString(36)}`, user });
-function localProfile(role: AccountRole, payload: { name?: string; phone?: string; vehicleType?: string; vehicleNumber?: string }): AuthUser {
+function localProfile(role: AccountRole, payload: { name?: string; phone?: string; vehicleType?: string; vehicleNumber?: string; licenceNumber?: string }): AuthUser {
   const base = { id: crypto.randomUUID?.() || `${Date.now()}`, email: '', role } as AuthUser;
   if (role === 'rider') base.rider = { name: payload.name!.trim(), phone: payload.phone!.trim() };
-  if (role === 'driver') base.driver = { name: payload.name!.trim(), phone: payload.phone!.trim(), vehicleType: payload.vehicleType, vehicleNumber: payload.vehicleNumber, status: 'pending' };
+  if (role === 'driver') base.driver = { name: payload.name!.trim(), phone: payload.phone!.trim(), vehicleType: payload.vehicleType, vehicleNumber: payload.vehicleNumber, licenceNumber: payload.licenceNumber, status: 'pending' };
   if (role === 'admin') { base.name = payload.name?.trim() || 'Administrator'; base.phone = payload.phone?.trim() || ''; }
   return base;
 }
@@ -142,6 +156,7 @@ async function localRegister(payload: { email: string; password: string; role: A
   if (!payload.name.trim()) throw new Error('Enter your name.');
   if (readAccounts().some((account) => account.user.email === email)) throw new Error('An account with this email already exists. Sign in instead.');
   const user = localProfile(payload.role, payload);
+  if ('adminRole' in payload) user.adminRole = payload.adminRole as AuthUser['adminRole'];
   user.email = email;
   const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
   const accounts = readAccounts();
@@ -181,21 +196,40 @@ export const authApi = {
   async register(payload: { email: string; password: string; role: 'rider' | 'driver'; name: string; phone: string; vehicleType?: string; vehicleNumber?: string; licenceNumber?: string }) {
     return USE_REMOTE_AUTH ? authenticate('/api/auth/register', payload) : localRegister(payload);
   },
-  registerAdmin(payload: { email: string; password: string; name: string; phone: string }) {
+  registerAdmin(payload: { email: string; password: string; name: string; phone: string; adminRole?: AuthUser['adminRole'] }) {
     return USE_REMOTE_AUTH ? Promise.reject(new Error('Create administrator accounts from the signed-in admin dashboard.')) : localRegister({ ...payload, role: 'admin' });
   },
   updateLocalProfile(user: AuthUser) {
     if (USE_REMOTE_AUTH) return;
     const accounts = readAccounts();
     const index = accounts.findIndex((account) => account.user.id === user.id);
-    if (index >= 0) { accounts[index].user = user; writeAccounts(accounts); }
+    if (index >= 0) {
+      accounts[index].user = user; writeAccounts(accounts);
+      const session = authApi.getSession();
+      if (session?.user.id === user.id) authApi.saveSession({ ...session, user });
+    }
   },
-  saveSession(session: AuthSession) { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); },
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    if (USE_REMOTE_AUTH) throw new Error('Password changes require the configured account security endpoint.');
+    if (newPassword.length < 8) throw new Error('New password must be at least 8 characters.');
+    const accounts = readAccounts();
+    const account = accounts.find((item) => item.user.id === userId);
+    if (!account || await passwordDigest(currentPassword, account.salt) !== account.passwordHash) throw new Error('Current password is incorrect.');
+    account.salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+    account.passwordHash = await passwordDigest(newPassword, account.salt);
+    writeAccounts(accounts);
+  },
+  saveSession(session: AuthSession) { localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, authMode: AUTH_MODE })); },
   getSession(): AuthSession | null {
     try {
       const stored = localStorage.getItem(SESSION_KEY);
       if (!stored) return null;
-      const session = normalizeAuthSession(JSON.parse(stored));
+      const storedSession = JSON.parse(stored);
+      if (asObject(storedSession)?.authMode !== AUTH_MODE) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      const session = normalizeAuthSession(storedSession);
       if (!session) localStorage.removeItem(SESSION_KEY);
       return session;
     } catch {
@@ -210,6 +244,7 @@ export interface AdminAccount {
   id: string;
   email: string;
   role: 'rider' | 'driver' | 'admin';
+  adminRole?: AuthUser['adminRole'];
   createdAt: string;
   name?: string;
   phone?: string | null;
@@ -221,11 +256,11 @@ export interface AdminAccount {
 export const adminApi = {
   async listUsers(token: string) {
     if (USE_REMOTE_AUTH) return request<AdminAccount[]>('/api/admin/users', {}, token);
-    return readAccounts().map(({ user, createdAt }) => ({ id: user.id, email: user.email, role: user.role, createdAt, name: user.rider?.name || user.driver?.name || user.name, phone: user.rider?.phone || user.driver?.phone || user.phone, vehicleType: user.driver?.vehicleType, vehicleNumber: user.driver?.vehicleNumber, driverStatus: user.driver?.status as AdminAccount['driverStatus'] }));
+    return readAccounts().map(({ user, createdAt }) => ({ id: user.id, email: user.email, role: user.role, adminRole: user.adminRole, createdAt, name: user.rider?.name || user.driver?.name || user.name, phone: user.rider?.phone || user.driver?.phone || user.phone, vehicleType: user.driver?.vehicleType, vehicleNumber: user.driver?.vehicleNumber, driverStatus: user.driver?.status as AdminAccount['driverStatus'] }));
   },
-  createAdmin(token: string, payload: { email: string; password: string }) {
+  createAdmin(token: string, payload: { email: string; password: string; adminRole?: AuthUser['adminRole']; name?: string; phone?: string }) {
     if (USE_REMOTE_AUTH) return request<{ id: string; email: string; role: 'admin' }>('/api/admin/admins', { method: 'POST', body: JSON.stringify(payload) }, token);
-    return localRegister({ ...payload, name: payload.email.split('@')[0], phone: '', role: 'admin' }).then(({ user }) => ({ id: user.id, email: user.email, role: 'admin' as const }));
+    return localRegister({ ...payload, name: payload.name || payload.email.split('@')[0], phone: payload.phone || '', role: 'admin' }).then(({ user }) => ({ id: user.id, email: user.email, role: 'admin' as const }));
   },
   async setDriverStatus(token: string, id: string, status: 'approved' | 'blocked') {
     if (USE_REMOTE_AUTH) return request<{ id: string; status: string }>(`/api/admin/drivers/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }, token);

@@ -7,6 +7,7 @@ import {
   VerificationDocument,
   SupportTicket,
   VehicleCategory,
+  RideServiceType,
   LocationPoint,
   FareBreakdown
 } from '../types';
@@ -71,6 +72,22 @@ export const AHMEDABAD_LOCATIONS: LocationPoint[] = [
     address: 'Near ISKCON Cross Roads, SG Highway, Ahmedabad',
     area: 'SG Highway',
     landmark: 'Flyover junction'
+  },
+  {
+    lat: 23.2156,
+    lng: 72.6369,
+    name: 'Gandhinagar Central Bus Station',
+    address: 'Sector 11, Gandhinagar, Gujarat',
+    area: 'Gandhinagar',
+    landmark: 'Central Bus Station'
+  },
+  {
+    lat: 22.3072,
+    lng: 73.1812,
+    name: 'Vadodara Railway Station',
+    address: 'Alkapuri, Vadodara, Gujarat',
+    area: 'Vadodara',
+    landmark: 'Main station entrance'
   }
 ];
 
@@ -605,6 +622,11 @@ class AppStore {
     this.persist();
   }
 
+  public updateRiderAccount(profile: Partial<RiderProfile>) {
+    this.state.rider = { ...this.state.rider, ...profile };
+    this.persist();
+  }
+
   // --- FARE CALCULATION ENGINE (Server authoritative logic) ---
   public calculateFare(
     category: VehicleCategory,
@@ -640,6 +662,8 @@ class AppStore {
   // --- RIDE LIFECYCLE ---
   public requestRide(params: {
     category: VehicleCategory;
+    serviceType?: RideServiceType;
+    serviceDetails?: string;
     pickup: LocationPoint;
     drop: LocationPoint;
     distanceKm: number;
@@ -666,6 +690,8 @@ class AppStore {
       riderRating: this.state.rider.rating,
       riderAvatar: this.state.rider.avatar,
       vehicleCategory: params.category,
+      serviceType: params.serviceType || 'city',
+      serviceDetails: params.serviceDetails,
       pickup: params.pickup,
       drop: params.drop,
       distanceKm: params.distanceKm,

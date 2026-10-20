@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { Header } from '../common/Header';
 import { VectorMap } from '../maps/VectorMap';
 import { store, AHMEDABAD_LOCATIONS } from '../../services/store';
-import { LocationPoint, VehicleCategory } from '../../types';
+import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
 import { Search, Mic, MapPin, Shield, PhoneCall, Zap, Compass, Car, Clock, Wallet, User } from 'lucide-react';
 
 interface RiderHomeProps {
-  onSelectRideFlow: (category: VehicleCategory, pickup: LocationPoint, drop: LocationPoint) => void;
+  onSelectRideFlow: (category: VehicleCategory, pickup: LocationPoint, drop: LocationPoint, serviceType: RideServiceType, serviceDetails?: string) => void;
   onOpenActivity: () => void;
   onOpenWallet: () => void;
   onOpenProfile: () => void;
   activeTab: 'home' | 'activity' | 'wallet' | 'profile';
   displayName?: string;
+  displayPhoto?: string;
 }
 
 export const RiderHome: React.FC<RiderHomeProps> = ({
@@ -20,22 +21,41 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
   onOpenWallet,
   onOpenProfile,
   activeTab,
-  displayName
+  displayName,
+  displayPhoto
 }) => {
   const [selectedPickup, setSelectedPickup] = useState<LocationPoint>(AHMEDABAD_LOCATIONS[0]);
   const [selectedDrop, setSelectedDrop] = useState<LocationPoint>(AHMEDABAD_LOCATIONS[1]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<VehicleCategory>('bike');
+  const [serviceType, setServiceType] = useState<RideServiceType>('city');
+  const [showLocationPrompt, setShowLocationPrompt] = useState(() => !sessionStorage.getItem('m3-location-checked'));
+  const [locationMessage, setLocationMessage] = useState('');
+  const [parcelNote, setParcelNote] = useState('');
+  const locationSuggestions = searchQuery.trim().length > 0
+    ? AHMEDABAD_LOCATIONS.filter((location) => `${location.name} ${location.area} ${location.address}`.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
+    : [];
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationModalTarget, setLocationModalTarget] = useState<'pickup' | 'drop'>('drop');
 
   const handleQuickDestination = (loc: LocationPoint) => {
     setSelectedDrop(loc);
-    onSelectRideFlow(selectedCategory, selectedPickup, loc);
+    onSelectRideFlow(selectedCategory, selectedPickup, loc, serviceType, serviceType === 'parcel' ? parcelNote.trim() : undefined);
   };
 
   const handleStartBooking = () => {
-    onSelectRideFlow(selectedCategory, selectedPickup, selectedDrop);
+    if (serviceType === 'parcel' && !parcelNote.trim()) { setLocationMessage('Add a short parcel description to continue.'); return; }
+    onSelectRideFlow(selectedCategory, selectedPickup, selectedDrop, serviceType, serviceType === 'parcel' ? parcelNote.trim() : undefined);
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) { setLocationMessage('Location is not available in this browser. Choose a pickup manually.'); return; }
+    navigator.geolocation.getCurrentPosition((position) => {
+      const { latitude, longitude } = position.coords;
+      setSelectedPickup({ lat: latitude, lng: longitude, name: 'Your current location', address: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, area: 'GPS location' });
+      setLocationMessage('Live pickup location is on.');
+      sessionStorage.setItem('m3-location-checked', 'yes'); setShowLocationPrompt(false);
+    }, () => setLocationMessage('Location permission was not granted. You can still choose a pickup on the map.'), { enableHighAccuracy: true, timeout: 10000 });
   };
 
   return (
@@ -43,7 +63,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
       {/* Top Header */}
       <Header
         onProfileClick={onOpenProfile}
-        userPhoto={store.getState().rider.avatar}
+        userPhoto={displayPhoto || store.getState().rider.avatar}
       />
 
       <main className="flex flex-col w-full pt-20">
@@ -51,7 +71,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
         <VectorMap
           mode="overview"
           height="h-[380px]"
-          onRecenter={() => setSelectedPickup(AHMEDABAD_LOCATIONS[0])}
+          onRecenter={requestLocation}
         />
 
         {/* Foreground Bottom Sheet with Elevation */}
@@ -99,9 +119,14 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
               Change
             </button>
           </div>
+          {locationMessage && <p className="-mt-2 mb-2 text-xs text-gray-500">{locationMessage}</p>}
+
+          <div className="mb-3 grid grid-cols-4 gap-1.5" aria-label="Ride service">
+            {([['city', 'Ride'], ['parcel', 'Parcel'], ['pro', 'Pro'], ['travel', 'Travel']] as const).map(([service, label]) => <button type="button" key={service} onClick={() => setServiceType(service)} className={`rounded-xl border px-2 py-2 text-xs font-bold transition-all ${serviceType === service ? 'border-[#FF6B00] bg-orange-50 text-[#A04100] shadow-[0_0_15px_rgba(255,107,0,.16)]' : 'border-gray-200 bg-white text-gray-600'}`}>{label}</button>)}
+          </div>
 
           {/* Tactical 'Where to?' Search Interactive Hub */}
-          <div className="relative flex items-center bg-white rounded-2xl shadow-sm border border-gray-200 p-1 mb-3.5 hover:border-gray-400 focus-within:border-[#FF6B00] transition-colors">
+          <div className="relative flex items-center bg-white rounded-2xl shadow-sm border border-gray-200 p-1 mb-3.5 hover:border-gray-400 focus-within:border-[#FF6B00] focus-within:shadow-[0_0_32px_rgba(255,107,0,.26)] transition-all duration-500">
             <div className="w-10 h-10 rounded-xl bg-[#FFDBCC] flex items-center justify-center shrink-0 text-[#A04100]">
               <Search className="w-5 h-5" />
             </div>
@@ -119,7 +144,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
                   handleQuickDestination(match);
                 }
               }}
-              placeholder="Where to? Search destination in Ahmedabad..."
+              placeholder={serviceType === 'parcel' ? 'Where should we deliver your parcel?' : serviceType === 'travel' ? 'Where to? Search any city in Gujarat...' : 'Where to? Search destination in Ahmedabad...'}
               className="w-full bg-transparent px-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none font-medium truncate"
             />
             <button
@@ -134,6 +159,9 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
               <Mic className="w-5 h-5" />
             </button>
           </div>
+          {locationSuggestions.length > 0 && <div className="relative z-30 -mt-3.5 mb-3.5 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">{locationSuggestions.map((location) => <button key={`${location.lat}-${location.lng}`} type="button" onClick={() => { setSearchQuery(location.name); handleQuickDestination(location); }} className="flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-orange-50"><MapPin size={16} className="mt-0.5 shrink-0 text-[#A04100]" /><span><span className="block text-sm font-bold text-gray-900">{location.name}</span><span className="block text-xs text-gray-500">{location.area} · {location.address}</span></span></button>)}</div>}
+          {serviceType === 'parcel' && <label className="mb-3 block text-xs font-semibold text-gray-600">Parcel details<input value={parcelNote} onChange={(event) => setParcelNote(event.target.value)} placeholder="What are you sending? (no restricted items)" className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" /></label>}
+          {serviceType === 'travel' && <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-900">Long distance trips across Ahmedabad, Gandhinagar, and Vadodara. Confirm trip details before booking.</div>}
 
           {/* Quick One-Tap Destination Pills (Horizontal Scrollable Carousel) */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-4 no-scrollbar">
@@ -156,7 +184,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
           {/* Service Category Tier List (Interactive Options Preview) */}
           <div className="flex flex-col gap-2 mb-4">
             <div className="flex items-center justify-between mb-0.5">
-              <span className="text-sm font-bold text-gray-900">Available Rides</span>
+              <span className="text-sm font-bold text-gray-900">{serviceType === 'parcel' ? 'Parcel delivery options' : serviceType === 'pro' ? 'M3 Pro rides' : serviceType === 'travel' ? 'Intercity options' : 'Available Rides'}</span>
               <span className="text-xs text-[#A04100] font-bold">Fastest Pickup: 2 mins</span>
             </div>
 
@@ -248,6 +276,15 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
             </div>
           </div>
 
+          <section className="mb-4 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white p-3.5">
+            <div className="mb-2 flex items-start justify-between gap-2"><div><h3 className="text-sm font-extrabold text-gray-900">Ahmedabad rides, in real life</h3><p className="text-xs text-gray-500">Local riders share their M3 RIDE experience</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-[#A04100]">#MadeForAhmedabad</span></div>
+            <div className="flex snap-x gap-3 overflow-x-auto pb-1">
+              <video className="w-[78%] shrink-0 snap-start rounded-xl bg-gray-900" controls playsInline preload="metadata" aria-label="Ahmedabad rider app review"><source src="/reviews/ahmedabad-rider-review.mp4" type="video/mp4" />Video playback is not supported in this browser.</video>
+              <video className="w-[78%] shrink-0 snap-start rounded-xl bg-gray-900" controls playsInline preload="metadata" aria-label="Ahmedabad ride review"><source src="/reviews/ahmedabad-ride-review.mp4" type="video/mp4" />Video playback is not supported in this browser.</video>
+            </div>
+            <p className="mt-2 text-[11px] font-semibold text-[#A04100]">#Ahmedabad #Gujarat #M3RIDE</p>
+          </section>
+
           {/* Safety & Citizen Support Action Banner */}
           <div className="flex items-center justify-between p-3 rounded-2xl bg-[#F0F3FF] mb-4 border border-blue-100">
             <div className="flex items-center gap-2.5">
@@ -275,10 +312,12 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
             className="w-full h-[52px] rounded-xl bg-[#FF6B00] hover:bg-[#E05E00] text-white text-base font-bold shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
           >
             <Zap className="w-5 h-5 fill-white text-white" />
-            <span>Request Immediate Pickup</span>
+            <span>{serviceType === 'parcel' ? 'Request Parcel Pickup' : serviceType === 'travel' ? 'Plan Long Distance Ride' : serviceType === 'pro' ? 'Request M3 Pro' : 'Request Immediate Pickup'}</span>
           </button>
         </div>
       </main>
+
+      {showLocationPrompt && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-5 backdrop-blur-sm"><section role="dialog" aria-modal="true" aria-labelledby="location-title" className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-[#A04100]"><MapPin size={28} /></div><h2 id="location-title" className="text-center text-lg font-extrabold text-gray-900">Turn on your location</h2><p className="mt-2 text-center text-sm leading-6 text-gray-600">M3 RIDE uses your location to show your pickup point and nearby rides around Ahmedabad.</p>{locationMessage && <p role="status" className="mt-3 text-center text-xs text-amber-700">{locationMessage}</p>}<button type="button" onClick={requestLocation} className="mt-5 w-full rounded-xl bg-[#FF6B00] py-3 font-bold text-white">Use my live location</button><button type="button" onClick={() => { sessionStorage.setItem('m3-location-checked', 'yes'); setShowLocationPrompt(false); }} className="mt-2 w-full rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-700">Choose pickup manually</button></section></div>}
 
       {/* Location Picker Modal */}
       {showLocationModal && (

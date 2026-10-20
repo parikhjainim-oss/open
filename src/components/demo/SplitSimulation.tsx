@@ -6,7 +6,7 @@ import { TripReceiptModal } from '../rider/TripReceiptModal';
 import { CaptainHome } from '../captain/CaptainHome';
 import { CaptainActiveTrip } from '../captain/CaptainActiveTrip';
 import { store } from '../../services/store';
-import { LocationPoint, VehicleCategory, Ride } from '../../types';
+import { LocationPoint, RideServiceType, VehicleCategory, Ride } from '../../types';
 import { Smartphone, Zap, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export const SplitSimulation: React.FC = () => {
@@ -14,6 +14,8 @@ export const SplitSimulation: React.FC = () => {
   const [riderScreen, setRiderScreen] = useState<'home' | 'vehicle_select' | 'tracking'>('home');
   const [bookingParams, setBookingParams] = useState<{
     category: VehicleCategory;
+    serviceType: RideServiceType;
+    serviceDetails?: string;
     pickup: LocationPoint;
     drop: LocationPoint;
   } | null>(null);
@@ -64,8 +66,8 @@ export const SplitSimulation: React.FC = () => {
             {riderScreen === 'home' && (
               <RiderHome
                 activeTab="home"
-                onSelectRideFlow={(category, pickup, drop) => {
-                  setBookingParams({ category, pickup, drop });
+                onSelectRideFlow={(category, pickup, drop, serviceType, serviceDetails) => {
+                  setBookingParams({ category, pickup, drop, serviceType, serviceDetails });
                   setRiderScreen('vehicle_select');
                 }}
                 onOpenActivity={() => {}}
@@ -78,14 +80,18 @@ export const SplitSimulation: React.FC = () => {
               <VehicleSelect
                 pickup={bookingParams.pickup}
                 drop={bookingParams.drop}
+                serviceType={bookingParams.serviceType}
+                serviceDetails={bookingParams.serviceDetails}
                 onBack={() => setRiderScreen('home')}
-                onConfirmBooking={(category, paymentMethod) => {
+                onConfirmBooking={(category, paymentMethod, distanceKm, durationMins) => {
                   const newRide = store.requestRide({
                     category,
+                    serviceType: bookingParams.serviceType,
+                    serviceDetails: bookingParams.serviceDetails,
                     pickup: bookingParams.pickup,
                     drop: bookingParams.drop,
-                    distanceKm: 8.4,
-                    durationMins: 22,
+                    distanceKm,
+                    durationMins,
                     paymentMethod,
                     promoCode: 'WELCOME_AMD'
                   });

@@ -25,6 +25,7 @@ interface CaptainHomeProps {
   onOpenProfile: () => void;
   displayName?: string;
   displayVehicleNumber?: string;
+  displayPhoto?: string;
 }
 
 export const CaptainHome: React.FC<CaptainHomeProps> = ({
@@ -32,7 +33,8 @@ export const CaptainHome: React.FC<CaptainHomeProps> = ({
   onOpenEarnings,
   onOpenProfile,
   displayName,
-  displayVehicleNumber
+  displayVehicleNumber,
+  displayPhoto
 }) => {
   const [captain, setCaptain] = useState<CaptainProfile>(() => store.getState().captains[0]);
   const [incomingRide, setIncomingRide] = useState<Ride | null>(null);
@@ -148,7 +150,7 @@ export const CaptainHome: React.FC<CaptainHomeProps> = ({
       {/* Header */}
       <Header
         onProfileClick={onOpenProfile}
-        userPhoto={captain.photo}
+        userPhoto={displayPhoto || captain.photo}
       />
 
       <main className="flex flex-col w-full pt-20">

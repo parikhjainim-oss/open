@@ -1,6 +1,7 @@
 export type UserRole = 'rider' | 'captain' | 'admin';
 
 export type VehicleCategory = 'bike' | 'auto' | 'cab';
+export type RideServiceType = 'city' | 'parcel' | 'pro' | 'travel';
 
 export type RideStatus =
   | 'REQUESTED'
@@ -52,6 +53,8 @@ export interface Ride {
   captainRating?: number;
   captainPhoto?: string;
   vehicleCategory: VehicleCategory;
+  serviceType?: RideServiceType;
+  serviceDetails?: string;
   vehicleNumber?: string;
   vehicleModel?: string;
   pickup: LocationPoint;
