@@ -72,6 +72,9 @@ npm run dev
 ```
 The application will launch on `http://localhost:3000`.
 
+### Local accounts
+Authentication uses browser-local accounts by default, so rider, driver, and administrator registration works without starting PostgreSQL or the API server. On the sign-in screen choose a role, select **Create an account** (for administrators, **Create an admin account**), and enter the requested profile details. Sign in with that email and password; profiles and account records stay in that browser's local storage. Signing out returns to sign-in and requires the password again. This mode is for local development and demos; it is not a shared or production account system. To use the PostgreSQL-backed API, set `VITE_AUTH_MODE=api` and `VITE_API_URL` to a configured backend before starting or building the frontend.
+
 ### Running Automated Business Logic Tests
 ```bash
 npm test

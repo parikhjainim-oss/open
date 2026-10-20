@@ -198,7 +198,7 @@ export default function App() {
         )}
 
         {/* ADMIN DASHBOARD */}
-        {role === 'admin' && session && <AdminDashboard token={session.token} accountEmail={session.user.email} userId={session.user.id} onLogout={handleLogout} />}
+        {role === 'admin' && session && <AdminDashboard token={session.token} accountEmail={session.user.email} accountName={session.user.name} accountPhone={session.user.phone} userId={session.user.id} onLogout={handleLogout} />}
 
         {/* DUAL SCREEN SPLIT VIEW */}
         {role === 'split' && <SplitSimulation />}

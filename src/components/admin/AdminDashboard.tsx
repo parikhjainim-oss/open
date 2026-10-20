@@ -43,7 +43,7 @@ type AdminTab =
   | 'subscriptions'
   | 'support';
 
-export const AdminDashboard: React.FC<{ token: string; accountEmail: string; userId: string; onLogout: () => void }> = ({ token, accountEmail, userId, onLogout }) => {
+export const AdminDashboard: React.FC<{ token: string; accountEmail: string; accountName?: string; accountPhone?: string | null; userId: string; onLogout: () => void }> = ({ token, accountEmail, accountName, accountPhone, userId, onLogout }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [state, setState] = useState<AppStoreState>(() => store.getState());
 
@@ -342,7 +342,7 @@ export const AdminDashboard: React.FC<{ token: string; accountEmail: string; use
           {activeTab === 'rides' && <AdminRides />}
           {activeTab === 'captains' && <AdminCaptains />}
           {activeTab === 'accounts' && <AdminAccounts token={token} />}
-          {activeTab === 'profile' && <AdminProfile email={accountEmail} accountId={userId} onLogout={onLogout} />}
+          {activeTab === 'profile' && <AdminProfile email={accountEmail} name={accountName} phone={accountPhone} accountId={userId} onLogout={onLogout} />}
           {activeTab === 'verification' && <AdminVerification />}
           {activeTab === 'pricing' && <AdminPricing />}
           {activeTab === 'subscriptions' && <AdminSubscriptions />}
