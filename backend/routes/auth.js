@@ -64,4 +64,26 @@ router.get('/me', authenticate, async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+// Update profile endpoint
+router.put('/profile', authenticate, async (req, res, next) => {
+  try {
+    const { name, phone, vehicleType, vehicleNumber, licenceNumber } = req.body || {};
+    // Update rider profile
+    if (req.user.role === 'rider') {
+      await pool.query('UPDATE rider_profiles SET name = $1, phone = $2 WHERE user_id = $3', [name, phone, req.user.id]);
+    }
+    // Update driver profile
+    if (req.user.role === 'driver') {
+      await pool.query('UPDATE driver_profiles SET name = $1, phone = $2, licence_number = $3, vehicle_type = $4, vehicle_number = $5 WHERE user_id = $6', [name, phone, licenceNumber, vehicleType, vehicleNumber, req.user.id]);
+    }
+    // Return updated public user
+    const result = await pool.query(`SELECT u.id, u.email, u.role, jsonb_build_object('name', d.name, 'phone', d.phone, 'licenceNumber', d.licence_number, 'vehicleType', d.vehicle_type, 'vehicleNumber', d.vehicle_number, 'status', d.status) AS driver, jsonb_build_object('name', r.name, 'phone', r.phone) AS rider FROM users u LEFT JOIN driver_profiles d ON d.user_id = u.id LEFT JOIN rider_profiles r ON r.user_id = u.id WHERE u.id = $1`, [req.user.id]);
+    const user = result.rows[0];
+    if (user.role !== 'driver') user.driver = null;
+    if (user.role !== 'rider') user.rider = null;
+    res.json({ user: publicUser(user) });
+  } catch (error) {
+    next(error);
+  }
+});
 module.exports = router;
