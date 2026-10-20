@@ -157,7 +157,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
                   }
                 }}
                 placeholder={serviceType === 'parcel' ? 'Where should we deliver your parcel?' : serviceType === 'travel' ? 'Where to? Search any city in Gujarat...' : 'Where to? Search destination in Ahmedabad...'}
-                className={`w-full truncate bg-transparent px-3 text-sm font-semibold caret-[#FF6B00] placeholder:font-medium placeholder:text-gray-400 focus:outline-none ${searchQuery ? 'destination-typed-text' : 'text-gray-900'}`}
+                className={`w-full truncate bg-transparent px-3 text-sm font-semibold caret-[#FF6B00] placeholder:font-medium placeholder:text-gray-400 focus:outline-none ${searchQuery ? 'text-[#A04100]' : 'text-gray-900'}`}
               />
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationModalTarget('drop'); setShowLocationModal(true); setSearchFocused(false); }} aria-label="Open destination list" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#A04100] transition-colors hover:bg-gray-100"><Mic className="h-5 w-5" /></button>
             </div>
