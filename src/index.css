@@ -62,6 +62,58 @@
   padding-top: env(safe-area-inset-top, 8px);
 }
 
+@keyframes destination-snake {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes destination-text-color {
+  to { background-position: 300% center; }
+}
+
+.destination-search-aura {
+  position: absolute;
+  z-index: -2;
+  inset: -20px -12px;
+  border-radius: 30px;
+  opacity: 0;
+  background:
+    radial-gradient(180px circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(255, 107, 0, .36), transparent 72%),
+    conic-gradient(from 0deg at 50% 50%, rgba(255, 107, 0, .16), rgba(0, 83, 219, .14), rgba(60, 210, 180, .13), rgba(255, 107, 0, .16));
+  filter: blur(22px);
+  transition: opacity .35s ease;
+  animation: destination-snake 2.8s linear infinite;
+  pointer-events: none;
+}
+
+.destination-search-active::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -2px;
+  border-radius: 19px;
+  background: conic-gradient(from 0deg, #ff6b00, #ffcf70, #7b61ff, #00b8a9, #ff6b00);
+  animation: destination-snake 1s linear infinite;
+}
+
+.destination-search-active .destination-search-aura { opacity: 1; }
+
+.destination-typed-text {
+  color: #a04100;
+  background: linear-gradient(90deg, #a04100, #0053db, #008c78, #ff6b00, #a04100);
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: destination-text-color 2.4s linear infinite;
+}
+
+.destination-suggestion-row { transition: background-color .2s ease, padding-left .2s ease; }
+.destination-suggestion-row:hover { padding-left: 1.15rem; background: linear-gradient(90deg, rgba(255, 107, 0, .08), rgba(0, 83, 219, .035), transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .destination-search-active::before, .destination-search-aura, .destination-typed-text { animation: none; }
+}
+
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(-14deg); }

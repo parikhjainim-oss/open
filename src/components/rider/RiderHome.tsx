@@ -27,14 +27,16 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
   const [selectedPickup, setSelectedPickup] = useState<LocationPoint>(AHMEDABAD_LOCATIONS[0]);
   const [selectedDrop, setSelectedDrop] = useState<LocationPoint>(AHMEDABAD_LOCATIONS[1]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [pointerPosition, setPointerPosition] = useState({ x: '50%', y: '50%' });
   const [selectedCategory, setSelectedCategory] = useState<VehicleCategory>('bike');
   const [serviceType, setServiceType] = useState<RideServiceType>('city');
   const [showLocationPrompt, setShowLocationPrompt] = useState(() => !sessionStorage.getItem('m3-location-checked'));
   const [locationMessage, setLocationMessage] = useState('');
   const [parcelNote, setParcelNote] = useState('');
   const locationSuggestions = searchQuery.trim().length > 0
-    ? AHMEDABAD_LOCATIONS.filter((location) => `${location.name} ${location.area} ${location.address}`.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
-    : [];
+    ? AHMEDABAD_LOCATIONS.filter((location) => `${location.name} ${location.area} ${location.address} ${location.landmark || ''}`.toLowerCase().includes(searchQuery.toLowerCase()))
+    : AHMEDABAD_LOCATIONS;
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationModalTarget, setLocationModalTarget] = useState<'pickup' | 'drop'>('drop');
 
@@ -126,40 +128,46 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
           </div>
 
           {/* Tactical 'Where to?' Search Interactive Hub */}
-          <div className="relative flex items-center bg-white rounded-2xl shadow-sm border border-gray-200 p-1 mb-3.5 hover:border-gray-400 focus-within:border-[#FF6B00] focus-within:shadow-[0_0_32px_rgba(255,107,0,.26)] transition-all duration-500">
-            <div className="w-10 h-10 rounded-xl bg-[#FFDBCC] flex items-center justify-center shrink-0 text-[#A04100]">
-              <Search className="w-5 h-5" />
+          <div
+            className={`relative z-30 mb-3.5 ${searchFocused ? 'destination-search-active' : ''}`}
+            style={{ '--pointer-x': pointerPosition.x, '--pointer-y': pointerPosition.y } as React.CSSProperties}
+            onPointerMove={(event) => {
+              const bounds = event.currentTarget.getBoundingClientRect();
+              setPointerPosition({ x: `${event.clientX - bounds.left}px`, y: `${event.clientY - bounds.top}px` });
+            }}
+          >
+            <div aria-hidden="true" className="destination-search-aura" />
+            <div className="relative flex items-center rounded-2xl border border-gray-200 bg-white p-1 shadow-sm transition-all duration-300 hover:border-gray-400 focus-within:border-[#FF6B00]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFDBCC] text-[#A04100]"><Search className="h-5 w-5" /></div>
+              <input
+                type="text"
+                aria-label="Destination Search"
+                aria-expanded={searchFocused}
+                aria-controls="destination-suggestions"
+                autoComplete="off"
+                value={searchQuery}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => window.setTimeout(() => setSearchFocused(false), 160)}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') { setSearchFocused(false); (event.target as HTMLInputElement).blur(); }
+                  if (event.key === 'Enter') {
+                    const match = locationSuggestions[0] || selectedDrop;
+                    setSearchQuery(match.name); setSearchFocused(false); handleQuickDestination(match);
+                  }
+                }}
+                placeholder={serviceType === 'parcel' ? 'Where should we deliver your parcel?' : serviceType === 'travel' ? 'Where to? Search any city in Gujarat...' : 'Where to? Search destination in Ahmedabad...'}
+                className={`w-full truncate bg-transparent px-3 text-sm font-semibold caret-[#FF6B00] placeholder:font-medium placeholder:text-gray-400 focus:outline-none ${searchQuery ? 'destination-typed-text' : 'text-gray-900'}`}
+              />
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationModalTarget('drop'); setShowLocationModal(true); setSearchFocused(false); }} aria-label="Open destination list" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#A04100] transition-colors hover:bg-gray-100"><Mic className="h-5 w-5" /></button>
             </div>
-            <input
-              type="text"
-              aria-label="Destination Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const match = AHMEDABAD_LOCATIONS.find((l) =>
-                    l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    l.area.toLowerCase().includes(searchQuery.toLowerCase())
-                  ) || selectedDrop;
-                  handleQuickDestination(match);
-                }
-              }}
-              placeholder={serviceType === 'parcel' ? 'Where should we deliver your parcel?' : serviceType === 'travel' ? 'Where to? Search any city in Gujarat...' : 'Where to? Search destination in Ahmedabad...'}
-              className="w-full bg-transparent px-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none font-medium truncate"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setLocationModalTarget('drop');
-                setShowLocationModal(true);
-              }}
-              aria-label="Location List"
-              className="w-10 h-10 rounded-xl hover:bg-gray-100 flex items-center justify-center text-[#A04100] shrink-0 transition-colors"
-            >
-              <Mic className="w-5 h-5" />
-            </button>
+            {searchFocused && <div id="destination-suggestions" role="listbox" className="destination-suggestion-panel absolute left-0 right-0 top-full z-40 mt-2 max-h-[min(60vh,420px)] overflow-y-auto rounded-2xl border border-white/80 bg-white/95 shadow-2xl backdrop-blur-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white/95 px-4 py-3 backdrop-blur-xl"><div><p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#A04100]">Choose your destination</p><p className="mt-0.5 text-xs text-gray-500">Ahmedabad · Gandhinagar · Vadodara</p></div><span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold text-[#A04100]">{locationSuggestions.length} places</span></div>
+              {locationSuggestions.length ? locationSuggestions.map((location, index) => <button key={`${location.lat}-${location.lng}`} role="option" aria-selected="false" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchQuery(location.name); setSearchFocused(false); handleQuickDestination(location); }} className="destination-suggestion-row flex w-full items-start gap-3 border-b border-gray-100/80 px-4 py-3 text-left last:border-0">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F0F3FF] text-[#A04100]"><MapPin size={16} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-gray-900">{location.name}</span><span className="mt-0.5 block truncate text-xs text-gray-500">{location.address}</span><span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">{location.area}{location.landmark ? ` · ${location.landmark}` : ''}</span></span><span className="pt-1 text-[10px] font-bold text-gray-400">{String(index + 1).padStart(2, '0')}</span>
+              </button>) : <p className="px-4 py-6 text-center text-sm text-gray-500">No matching addresses. Try another Ahmedabad area or landmark.</p>}
+            </div>}
           </div>
-          {locationSuggestions.length > 0 && <div className="relative z-30 -mt-3.5 mb-3.5 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">{locationSuggestions.map((location) => <button key={`${location.lat}-${location.lng}`} type="button" onClick={() => { setSearchQuery(location.name); handleQuickDestination(location); }} className="flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-orange-50"><MapPin size={16} className="mt-0.5 shrink-0 text-[#A04100]" /><span><span className="block text-sm font-bold text-gray-900">{location.name}</span><span className="block text-xs text-gray-500">{location.area} · {location.address}</span></span></button>)}</div>}
           {serviceType === 'parcel' && <label className="mb-3 block text-xs font-semibold text-gray-600">Parcel details<input value={parcelNote} onChange={(event) => setParcelNote(event.target.value)} placeholder="What are you sending? (no restricted items)" className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" /></label>}
           {serviceType === 'travel' && <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-900">Long distance trips across Ahmedabad, Gandhinagar, and Vadodara. Confirm trip details before booking.</div>}
 
@@ -275,15 +283,6 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
               </div>
             </div>
           </div>
-
-          <section className="mb-4 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white p-3.5">
-            <div className="mb-2 flex items-start justify-between gap-2"><div><h3 className="text-sm font-extrabold text-gray-900">Ahmedabad rides, in real life</h3><p className="text-xs text-gray-500">Local riders share their M3 RIDE experience</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-[#A04100]">#MadeForAhmedabad</span></div>
-            <div className="flex snap-x gap-3 overflow-x-auto pb-1">
-              <video className="w-[78%] shrink-0 snap-start rounded-xl bg-gray-900" controls playsInline preload="metadata" aria-label="Ahmedabad rider app review"><source src="/reviews/ahmedabad-rider-review.mp4" type="video/mp4" />Video playback is not supported in this browser.</video>
-              <video className="w-[78%] shrink-0 snap-start rounded-xl bg-gray-900" controls playsInline preload="metadata" aria-label="Ahmedabad ride review"><source src="/reviews/ahmedabad-ride-review.mp4" type="video/mp4" />Video playback is not supported in this browser.</video>
-            </div>
-            <p className="mt-2 text-[11px] font-semibold text-[#A04100]">#Ahmedabad #Gujarat #M3RIDE</p>
-          </section>
 
           {/* Safety & Citizen Support Action Banner */}
           <div className="flex items-center justify-between p-3 rounded-2xl bg-[#F0F3FF] mb-4 border border-blue-100">
