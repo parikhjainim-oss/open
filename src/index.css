@@ -107,6 +107,27 @@
 .destination-suggestion-row { transition: background-color .2s ease, padding-left .2s ease; }
 .destination-suggestion-row:hover { padding-left: 1.15rem; background: linear-gradient(90deg, rgba(255, 107, 0, .08), rgba(0, 83, 219, .035), transparent); }
 
+/* Keep button feedback consistent throughout rider, driver, and admin flows. */
+button:not(:disabled) {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+button:not(:disabled):hover {
+  border-color: #ff6b00;
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, .18);
+}
+
+button:not(:disabled):active {
+  transform: scale(.98);
+}
+
+button:focus-visible {
+  outline: 2px solid #ff6b00;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .destination-search-active::before { animation: none; }
 }
