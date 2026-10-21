@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Header } from '../common/Header';
 import { VectorMap } from '../maps/VectorMap';
+import { LiveMap } from '../maps/LiveMap';
 import { store, AHMEDABAD_LOCATIONS } from '../../services/store';
 import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
 import { Search, Mic, MapPin, Shield, PhoneCall, Zap, Compass, Car, Clock, Wallet, User } from 'lucide-react';
