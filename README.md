@@ -105,11 +105,11 @@ npm start
 
 For a separate frontend and backend deployment, set the frontend build variable VITE_API_URL to the backend's public HTTPS URL and set backend CORS_ORIGINS to the frontend origin. The client defaults to its own origin when VITE_API_URL is omitted.
 
-### Live Google map
+### Live map (Leaflet + OpenStreetMap)
 
-The rider home map uses the Google Maps JavaScript API. Set `VITE_GOOGLE_MAPS_BROWSER_KEY` in the frontend environment (for local development, add it to `.env.local` and restart Vite); enable the Maps JavaScript API, attach billing, and restrict the browser key by HTTP referrer to the deployed site and local development origin. The browser key is public by design and must be restricted. `VITE_GOOGLE_MAPS_MAP_ID` is optional: configure it to use Advanced Markers, or omit it to use standard Google Maps pins. Rebuild the frontend after changing deployment variables. If the key is absent or Google rejects the request, the map displays a visible setup/error state.
+The rider home map renders interactive OpenStreetMap tiles via Leaflet — no API key and no billing account are required. It supports pickup and destination pins, an orange route line, nearby captain dots, tap-to-set pickup, and GPS recentering. OpenStreetMap's required attribution ("© OpenStreetMap contributors") is shown on the map.
 
-The configured map currently supports Ahmedabad map display, pickup and destination pins, map-tap pickup selection, and GPS recentering. Server-side Routes API quotes, Places autocomplete, real captain location streaming, and ride dispatch are not yet connected to this map. Existing booking and trip lifecycle flows still use the browser demo store; use `VITE_AUTH_MODE=api` only for the account endpoints that are implemented in `backend`.
+To change tile providers later, edit one file: `src/config/mapTiles.ts` (the `TILE_URL` and `TILE_ATTRIBUTION` constants). Destination search uses OSM Nominatim (also keyless). The backend's optional Routes-API polyline (`GOOGLE_MAPS_SERVER_KEY`) is independent and can stay unset; rides then use the estimated route.
 
 ### Deploying the full app on Render
 
@@ -127,8 +127,8 @@ GEMINI_API_KEY="MY_GEMINI_API_KEY"
 # APP_URL: Cloud Run / Hosting service URL
 APP_URL="http://localhost:3000"
 
-# GOOGLE_MAPS_API_KEY (Optional for production map tiles)
-# VITE_GOOGLE_MAPS_API_KEY=""
+# GOOGLE_MAPS_API_KEY — not required. Map tiles are OpenStreetMap via
+# src/config/mapTiles.ts (edit TILE_URL there to change providers).
 
 # RAZORPAY_KEY_ID (Optional for production UPI sandbox)
 # VITE_RAZORPAY_KEY_ID=""
