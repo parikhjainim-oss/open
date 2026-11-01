@@ -105,6 +105,12 @@ npm start
 
 For a separate frontend and backend deployment, set the frontend build variable VITE_API_URL to the backend's public HTTPS URL and set backend CORS_ORIGINS to the frontend origin. The client defaults to its own origin when VITE_API_URL is omitted.
 
+### Live Google map
+
+The rider home map uses the Google Maps JavaScript API and Advanced Markers when both `VITE_GOOGLE_MAPS_BROWSER_KEY` and `VITE_GOOGLE_MAPS_MAP_ID` are configured at frontend build time. In Google Cloud, enable Maps JavaScript API, attach billing, create a JavaScript map ID, and restrict the browser key by HTTP referrer to the deployed site and local development origin. The browser key is public by design and must be restricted. Set both variables in the frontend hosting service and rebuild. If either value is absent or Google rejects the request, the map displays a visible setup/error state.
+
+The configured map currently supports Ahmedabad map display, pickup and destination pins, map-tap pickup selection, and GPS recentering. Server-side Routes API quotes, Places autocomplete, real captain location streaming, and ride dispatch are not yet connected to this map. Existing booking and trip lifecycle flows still use the browser demo store; use `VITE_AUTH_MODE=api` only for the account endpoints that are implemented in `backend`.
+
 ### Deploying the full app on Render
 
 The root `render.yaml` keeps the existing `open` static frontend and adds an `open-api` Node web service. Render injects the API service URL into the frontend build as `VITE_API_URL`. The API service requires a PostgreSQL `DATABASE_URL` and initial `ADMIN_EMAIL` / `ADMIN_PASSWORD`; it runs the schema migration on startup. The existing static site cannot run API routes itself. Keep its public origin in the API service's `CORS_ORIGINS` if the hostname changes.

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Header } from '../common/Header';
-import { VectorMap } from '../maps/VectorMap';
 import { LiveMap } from '../maps/LiveMap';
 import { store, AHMEDABAD_LOCATIONS } from '../../services/store';
 import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
@@ -70,12 +69,21 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
       />
 
       <main className="flex flex-col w-full pt-20">
-        {/* Interactive Map Substrate */}
-        <VectorMap
-          mode="overview"
-          height="h-[380px]"
-          onRecenter={requestLocation}
-        />
+        {/* Real Google map when configured; map taps set the pickup pin. */}
+        <div className="px-3">
+          <LiveMap
+            height="380px"
+            pickup={selectedPickup}
+            drop={selectedDrop}
+            onMapSelect={(point) => {
+              setSelectedPickup({ ...point, name: 'Pickup pin', area: 'Selected on map' });
+              setLocationMessage('Pickup pin updated on the map.');
+            }}
+          />
+          <div className="-mt-9 relative z-10 mx-auto w-fit rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-gray-600 shadow">
+            Tap map to set pickup · <button type="button" onClick={requestLocation} className="text-[#A04100] underline">Use my location</button>
+          </div>
+        </div>
 
         {/* Foreground Bottom Sheet with Elevation */}
         <div className="flex flex-col -mt-5 bg-white rounded-t-3xl pt-3 px-4 pb-6 relative z-20 shadow-[0_-8px_24px_rgba(21,28,39,0.08)]">
