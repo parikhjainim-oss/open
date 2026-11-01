@@ -139,7 +139,10 @@ export const LiveMap: React.FC<LiveMapProps> = ({
       };
       addMarker(pickup, 'pickup');
       addMarker(drop, 'drop');
-    }).catch(() => undefined);
+    }).catch((cause: unknown) => {
+      if (!active) return;
+      setError(cause instanceof Error ? cause.message : 'Unable to load map markers.');
+    });
     return () => { active = false; };
   }, [pickup, drop, status, key, mapId]);
 
