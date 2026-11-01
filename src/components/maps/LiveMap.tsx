@@ -19,10 +19,12 @@ type MapInstance = {
   setZoom: (zoom: number) => void;
   addListener: (event: string, handler: (event: { latLng?: { lat: () => number; lng: () => number } }) => void) => { remove: () => void };
 };
-type MarkerInstance = { map: MapInstance | null; position: LatLng; title?: string; content?: HTMLElement };
+type AdvancedMarkerOptions = { map: MapInstance | null; position: LatLng; title?: string; content?: HTMLElement };
+type MarkerCleanup = { remove: () => void };
 type MapsApi = {
   Map: new (element: HTMLElement, options: Record<string, unknown>) => MapInstance;
-  marker: { AdvancedMarkerElement: new (options: MarkerInstance) => { map: MapInstance | null } };
+  Marker: new (options: { map: MapInstance; position: LatLng; title?: string }) => { setMap: (map: MapInstance | null) => void };
+  marker: { AdvancedMarkerElement: new (options: AdvancedMarkerOptions) => { map: MapInstance | null } };
 };
 type MapsWindow = Window & { google?: { maps?: MapsApi }; m3RideMapsReady?: () => void };
 
@@ -83,32 +85,34 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   const clickListenerRef = useRef<{ remove: () => void } | null>(null);
   onMapSelectRef.current = onMapSelect;
   const mapRef = useRef<MapInstance | null>(null);
-  const markerRefs = useRef<Array<{ map: MapInstance | null }>>([]);
+  const markerRefs = useRef<MarkerCleanup[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState('');
+  const [markerError, setMarkerError] = useState('');
   const key = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY as string | undefined;
   const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined;
 
   useEffect(() => {
     let active = true;
-    if (!key || !mapId) {
+    if (!key) {
       setStatus('error');
-      setError(!key ? 'Add VITE_GOOGLE_MAPS_BROWSER_KEY to enable the live map.' : 'Add VITE_GOOGLE_MAPS_MAP_ID to enable advanced map markers.');
+      setError('Add VITE_GOOGLE_MAPS_BROWSER_KEY to enable the live map.');
       return () => { active = false; };
     }
     setStatus('loading');
     loadGoogleMaps(key).then((maps) => {
       if (!active || !elementRef.current) return;
-      const map = new maps.Map(elementRef.current, {
+      const mapOptions: Record<string, unknown> = {
         center: { lat: pickup?.lat ?? lat, lng: pickup?.lng ?? lng },
         zoom,
-        mapId,
         clickableIcons: false,
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
         gestureHandling: 'greedy',
-      });
+      };
+      if (mapId) mapOptions.mapId = mapId;
+      const map = new maps.Map(elementRef.current, mapOptions);
       mapRef.current = map;
       const clickListener = map.addListener('click', (event) => {
         const point = event.latLng;
@@ -121,27 +125,35 @@ export const LiveMap: React.FC<LiveMapProps> = ({
       setError(cause instanceof Error ? cause.message : 'Google Maps is unavailable.');
       setStatus('error');
     });
-    return () => { active = false; clickListenerRef.current?.remove(); clickListenerRef.current = null; markerRefs.current.forEach((marker) => { marker.map = null; }); markerRefs.current = []; mapRef.current = null; };
+    return () => { active = false; clickListenerRef.current?.remove(); clickListenerRef.current = null; markerRefs.current.forEach((marker) => marker.remove()); markerRefs.current = []; mapRef.current = null; };
   }, [key, mapId, lat, lng, zoom]);
 
   useEffect(() => {
     let active = true;
     const map = mapRef.current;
-    if (!map || status !== 'ready' || !key || !mapId) return;
+    if (!map || status !== 'ready' || !key) return;
     if (pickup) map.setCenter({ lat: pickup.lat, lng: pickup.lng });
     loadGoogleMaps(key).then((maps) => {
       if (!active) return;
-      markerRefs.current.forEach((marker) => { marker.map = null; });
+      markerRefs.current.forEach((marker) => marker.remove());
       markerRefs.current = [];
       const addMarker = (point: LocationPoint | undefined, kind: 'pickup' | 'drop') => {
         if (!point) return;
-        markerRefs.current.push(new maps.marker.AdvancedMarkerElement({ map, position: { lat: point.lat, lng: point.lng }, title: `${kind === 'pickup' ? 'Pickup' : 'Destination'}: ${point.name}`, content: markerContent(kind) }));
+        const title = `${kind === 'pickup' ? 'Pickup' : 'Destination'}: ${point.name}`;
+        if (mapId) {
+          const marker = new maps.marker.AdvancedMarkerElement({ map, position: { lat: point.lat, lng: point.lng }, title, content: markerContent(kind) });
+          markerRefs.current.push({ remove: () => { marker.map = null; } });
+        } else {
+          const marker = new maps.Marker({ map, position: { lat: point.lat, lng: point.lng }, title });
+          markerRefs.current.push({ remove: () => marker.setMap(null) });
+        }
       };
       addMarker(pickup, 'pickup');
       addMarker(drop, 'drop');
+      setMarkerError('');
     }).catch((cause: unknown) => {
       if (!active) return;
-      setError(cause instanceof Error ? cause.message : 'Unable to load map markers.');
+      setMarkerError(cause instanceof Error && cause.message ? cause.message : 'Unable to load map markers.');
     });
     return () => { active = false; };
   }, [pickup, drop, status, key, mapId]);
@@ -168,7 +180,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
         </div>
       )}
       {status === 'ready' && <button type="button" onClick={recenter} aria-label="Recenter map on my location" className="absolute bottom-4 right-4 z-10 rounded-xl bg-white p-3 text-gray-700 shadow-lg hover:text-[#FF6B00]"><LocateFixed size={19} /></button>}
-      {error && status === 'ready' && <div role="status" className="absolute left-3 right-3 top-3 rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow">{error}</div>}
+      {(markerError || error) && status === 'ready' && <div role="status" className="absolute left-3 right-3 top-3 rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow">{markerError || error}</div>}
     </div>
   );
 };
