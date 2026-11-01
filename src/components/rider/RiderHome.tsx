@@ -3,6 +3,7 @@ import { Header } from '../common/Header';
 import { LiveMap } from '../maps/LiveMap';
 import { store, AHMEDABAD_LOCATIONS } from '../../services/store';
 import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
+import type { NearbyCaptainPoint } from '../maps/LiveMap';
 import { Search, Mic, MapPin, Shield, PhoneCall, Zap, Compass, Car, Clock, Wallet, User } from 'lucide-react';
 
 interface RiderHomeProps {
@@ -39,6 +40,12 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
     : AHMEDABAD_LOCATIONS;
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationModalTarget, setLocationModalTarget] = useState<'pickup' | 'drop'>('drop');
+  const [nearbyCaptains, setNearbyCaptains] = useState<NearbyCaptainPoint[]>(() => [
+    { lat: AHMEDABAD_LOCATIONS[0].lat + 0.008, lng: AHMEDABAD_LOCATIONS[0].lng + 0.006, label: 'Bike · GJ-01-ET-7842' },
+    { lat: AHMEDABAD_LOCATIONS[0].lat - 0.011, lng: AHMEDABAD_LOCATIONS[0].lng + 0.014, label: 'Auto · GJ-01-AB-1130' },
+    { lat: AHMEDABAD_LOCATIONS[0].lat + 0.004, lng: AHMEDABAD_LOCATIONS[0].lng - 0.017, label: 'Prime Cab · GJ-01-KP-9001' },
+    { lat: AHMEDABAD_LOCATIONS[0].lat - 0.006, lng: AHMEDABAD_LOCATIONS[0].lng - 0.009, label: 'Bike · GJ-18-MM-4521' },
+  ]);
 
   const handleQuickDestination = (loc: LocationPoint) => {
     setSelectedDrop(loc);
@@ -75,6 +82,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
             height="380px"
             pickup={selectedPickup}
             drop={selectedDrop}
+            nearbyCaptains={nearbyCaptains}
             onMapSelect={(point) => {
               setSelectedPickup({ ...point, name: 'Pickup pin', area: 'Selected on map' });
               setLocationMessage('Pickup pin updated on the map.');
