@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Map as MapIcon, KeyRound, LocateFixed } from 'lucide-react';
 import { LocationPoint } from '../../types';
+import { RouteResult, liveApi } from '../../services/api';
 
 export interface NearbyCaptainPoint { lat: number; lng: number; label?: string; }
 
@@ -31,9 +32,10 @@ type MapsApi = {
   Map: new (element: HTMLElement, options: Record<string, unknown>) => MapInstance;
   Marker: new (options: { map: MapInstance; position: LatLng; title?: string }) => { setMap: (map: MapInstance | null) => void };
   marker: { AdvancedMarkerElement: new (options: AdvancedMarkerOptions) => { map: MapInstance | null } };
-  Polyline: new (options: { path: LatLng[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number; map?: MapInstance; clickable?: boolean; geodesic?: boolean }) => PolylineInstance;
+  Polyline: new (options: { path: LatLng[]; strokeColor?: string; strokeOpacity?: number; strokeWeight?: number; map?: MapInstance; clickable?: boolean; geodesic?: boolean; icons?: unknown }) => PolylineInstance;
   Circle: new (options: { center: LatLng; radius: number; map?: MapInstance; fillColor?: string; fillOpacity?: number; strokeColor?: string; strokeWeight?: number; clickable?: boolean }) => CircleInstance;
-  SymbolPath?: unknown;
+  SymbolPath?: Record<string, unknown>;
+  encoding?: { decodePath: (encoded: string) => LatLng[] };
 };
 type MapsWindow = Window & { google?: { maps?: MapsApi }; m3RideMapsReady?: () => void };
 
@@ -70,6 +72,15 @@ function loadGoogleMaps(key: string): Promise<MapsApi> {
   return mapsLoader;
 }
 
+function haversineKm(a: LatLng, b: LatLng) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 const markerContent = (kind: 'pickup' | 'drop') => {
   const element = document.createElement('div');
   element.style.cssText = `width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${kind === 'pickup' ? '#FF6B00' : '#171717'};border:3px solid #fff;box-shadow:0 2px 8px #0004;`;
@@ -94,7 +105,6 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   const elementRef = useRef<HTMLDivElement>(null);
   const onMapSelectRef = useRef(onMapSelect);
   const clickListenerRef = useRef<{ remove: () => void } | null>(null);
-type NearbyCaptainPoint = { lat: number; lng: number; label?: string };
   const nearbyCaptainsRef = useRef(nearbyCaptains);
   const onRouteInfoRef = useRef(onRouteInfo);
   onMapSelectRef.current = onMapSelect;
@@ -146,30 +156,44 @@ type NearbyCaptainPoint = { lat: number; lng: number; label?: string };
     return () => { active = false; clickListenerRef.current?.remove(); clickListenerRef.current = null; markerRefs.current.forEach((marker) => marker.remove()); markerRefs.current = []; polylineRef.current = null; mapRef.current = null; };
   }, [key, mapId, lat, lng, zoom]);
 
-  // Route line between pickup and drop (haversine distance + traffic-paced ETA).
+  // Route line between pickup and drop — backend Routes API polyline when
+  // configured, with a haversine straight-line estimate as fallback.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || status !== 'ready' || !key || !pickup || !drop) { if (!pickup || !drop) { polylineRef.current?.setMap(null); polylineRef.current = null; setRouteInfo(null); onRouteInfoRef.current = null as never; } return; }
-    const haversine = (a: LatLng, b: LatLng) => {
-      const toRad = (deg: number) => (deg * Math.PI) / 180;
-      const R = 6371; const dLat = toRad(b.lat - a.lat); const dLng = toRad(b.lng - a.lng);
-      const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-      return 2 * R * Math.asin(Math.sqrt(h));
+    if (!map || status !== 'ready' || !key || !pickup || !drop) { if (!pickup || !drop) { polylineRef.current?.setMap(null); polylineRef.current = null; setRouteInfo(null); } return; }
+    let cancelled = false;
+    const maps = () => (window as MapsWindow).google?.maps;
+
+    const drawPath = (path: LatLng[], distanceKm: number, etaMins: number) => {
+      const mapsApi = maps();
+      if (!mapsApi || cancelled) return;
+      polylineRef.current?.setMap(null);
+      const casing = new mapsApi.Polyline({ path, strokeColor: '#FF6B00', strokeOpacity: 0.35, strokeWeight: 8, geodesic: true, clickable: false, map });
+      const core = new mapsApi.Polyline({ path, strokeColor: '#FF6B00', strokeOpacity: 0.95, strokeWeight: 4, geodesic: true, clickable: false, map });
+      polylineRef.current = { setMap: (m) => { casing.setMap(m); core.setMap(m); } };
+      setRouteInfo({ distanceKm, etaMins });
+      onRouteInfoRef.current?.({ distanceKm, etaMins });
     };
-    const straightKm = haversine({ lat: pickup.lat, lng: pickup.lng }, { lat: drop.lat, lng: drop.lng });
-    const roadKm = Math.round(straightKm * 1.35 * 10) / 10; // road-factor correction
-    const etaMins = Math.max(4, Math.round((roadKm / 24) * 60 + 2)); // ~24 km/h urban average + slack
-    const maps = (window as MapsWindow).google?.maps;
-    if (!maps) return;
-    polylineRef.current?.setMap(null);
-    const solid = new maps.Polyline({
-      path: [ { lat: pickup.lat, lng: pickup.lng }, { lat: drop.lat, lng: drop.lng } ],
-      strokeColor: '#FF6B00', strokeOpacity: 0.85, strokeWeight: 4, geodesic: true, clickable: false,
-      map,
-    });
-    polylineRef.current = { setMap: (m) => { solid.setMap(m); } };
-    setRouteInfo({ distanceKm: roadKm, etaMins });
-    onRouteInfoRef.current?.({ distanceKm: roadKm, etaMins });
+
+    const drawEstimate = () => {
+      const straightKm = haversineKm({ lat: pickup.lat, lng: pickup.lng }, { lat: drop.lat, lng: drop.lng });
+      const roadKm = Math.round(straightKm * 1.35 * 10) / 10;
+      drawPath([ { lat: pickup.lat, lng: pickup.lng }, { lat: drop.lat, lng: drop.lng } ], roadKm, Math.max(4, Math.round((roadKm / 24) * 60 + 2)));
+    };
+
+    liveApi.route({ pickup: { lat: pickup.lat, lng: pickup.lng }, drop: { lat: drop.lat, lng: drop.lng } }).then((result: RouteResult) => {
+      if (cancelled) return;
+      const mapsApi = maps();
+      if (result.polyline && mapsApi?.encoding) {
+        drawPath(mapsApi.encoding.decodePath(result.polyline), result.distanceKm, result.etaMins);
+      } else if (result.source === 'google_routes' || result.source === 'local_estimate') {
+        drawEstimate();
+      } else {
+        drawPath([], result.distanceKm, result.etaMins); // never: keeps types happy
+      }
+    }).catch(() => { if (!cancelled) drawEstimate(); });
+
+    return () => { cancelled = true; };
   }, [pickup, drop, status, key]);
 
   useEffect(() => {

@@ -39,3 +39,31 @@ CREATE TABLE IF NOT EXISTS ride_events (
   status VARCHAR(24) NOT NULL, note TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS ride_events_ride_created_idx ON ride_events (ride_id, created_at);
+
+-- Live captain GPS locations (one row per online driver, upserted).
+CREATE TABLE IF NOT EXISTS driver_locations (
+  driver_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  lat DOUBLE PRECISION NOT NULL CHECK (lat BETWEEN -90 AND 90),
+  lng DOUBLE PRECISION NOT NULL CHECK (lng BETWEEN -180 AND 180),
+  heading DOUBLE PRECISION, vehicle_type VARCHAR(24),
+  is_online BOOLEAN NOT NULL DEFAULT true,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS driver_locations_online_idx ON driver_locations (is_online, updated_at DESC);
+
+-- Rider/captain chat messages per ride.
+CREATE TABLE IF NOT EXISTS ride_messages (
+  id BIGSERIAL PRIMARY KEY, ride_id UUID NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES users(id), sender_role VARCHAR(16) NOT NULL CHECK (sender_role IN ('rider', 'driver')),
+  text VARCHAR(500) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ride_messages_ride_created_idx ON ride_messages (ride_id, created_at);
+
+-- UPI payment intents (Razorpay or simulated sandbox orders).
+CREATE TABLE IF NOT EXISTS payment_intents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), ride_id UUID NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
+  provider VARCHAR(24) NOT NULL DEFAULT 'razorpay', order_id VARCHAR(128) UNIQUE NOT NULL,
+  amount_paise INTEGER NOT NULL CHECK (amount_paise > 0), status VARCHAR(16) NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'paid', 'failed')),
+  payment_ref VARCHAR(128), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), paid_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS payment_intents_ride_idx ON payment_intents (ride_id);

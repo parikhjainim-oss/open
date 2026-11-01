@@ -4,6 +4,8 @@ import { LiveMap } from '../maps/LiveMap';
 import { store, AHMEDABAD_LOCATIONS } from '../../services/store';
 import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
 import type { NearbyCaptainPoint } from '../maps/LiveMap';
+import { searchPlaces, resolvePlace, PlacePrediction } from '../../services/places';
+import { authApi, USE_REMOTE_AUTH, liveApi } from '../../services/api';
 import { Search, Mic, MapPin, Shield, PhoneCall, Zap, Compass, Car, Clock, Wallet, User } from 'lucide-react';
 
 interface RiderHomeProps {
@@ -40,6 +42,7 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
     : AHMEDABAD_LOCATIONS;
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationModalTarget, setLocationModalTarget] = useState<'pickup' | 'drop'>('drop');
+  const [googlePredictions, setGooglePredictions] = useState<PlacePrediction[]>([]);
   const [nearbyCaptains, setNearbyCaptains] = useState<NearbyCaptainPoint[]>(() => [
     { lat: AHMEDABAD_LOCATIONS[0].lat + 0.008, lng: AHMEDABAD_LOCATIONS[0].lng + 0.006, label: 'Bike · GJ-01-ET-7842' },
     { lat: AHMEDABAD_LOCATIONS[0].lat - 0.011, lng: AHMEDABAD_LOCATIONS[0].lng + 0.014, label: 'Auto · GJ-01-AB-1130' },
@@ -65,6 +68,45 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
       setLocationMessage('Live pickup location is on.');
       sessionStorage.setItem('m3-location-checked', 'yes'); setShowLocationPrompt(false);
     }, () => setLocationMessage('Location permission was not granted. You can still choose a pickup on the map.'), { enableHighAccuracy: true, timeout: 10000 });
+  };
+
+  // Debounced Google Places autocomplete (active once the map script is up).
+  React.useEffect(() => {
+    if (searchQuery.trim().length < 3) { setGooglePredictions([]); return; }
+    const timer = window.setTimeout(() => {
+      searchPlaces(searchQuery, selectedPickup.lat, selectedPickup.lng).then(setGooglePredictions).catch(() => setGooglePredictions([]));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, selectedPickup.lat, selectedPickup.lng]);
+
+  // Live nearby captains: poll the backend fleet feed when connected; keep
+  // simulated dots for offline demo mode.
+  React.useEffect(() => {
+    if (!USE_REMOTE_AUTH) return;
+    const session = authApi.getSession();
+    if (!session) return;
+    let stopped = false;
+    const poll = () => {
+      liveApi.captains(session.token, selectedPickup.lat, selectedPickup.lng)
+        .then((captains) => {
+          if (stopped || captains.length === 0) return;
+          setNearbyCaptains(captains.map((c) => ({ lat: c.lat, lng: c.lng, label: `${c.vehicleType || 'Captain'} · ${c.vehicleNumber || c.name || ''}` })));
+        })
+        .catch(() => { /* keep last known positions */ });
+    };
+    poll();
+    const interval = window.setInterval(poll, 10000);
+    return () => { stopped = true; window.clearInterval(interval); };
+  }, [selectedPickup.lat, selectedPickup.lng]);
+
+  const handleGooglePrediction = (prediction: PlacePrediction) => {
+    setSearchFocused(false);
+    resolvePlace(prediction.placeId).then((resolved) => {
+      if (!resolved) { setLocationMessage('Could not resolve that place. Try a nearby landmark.'); return; }
+      const point: LocationPoint = { lat: resolved.lat, lng: resolved.lng, name: prediction.primary, address: resolved.address || prediction.secondary, area: resolved.area };
+      setSearchQuery(prediction.primary);
+      handleQuickDestination(point);
+    });
   };
 
   return (
@@ -179,7 +221,16 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
               <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationModalTarget('drop'); setShowLocationModal(true); setSearchFocused(false); }} aria-label="Open destination list" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#A04100] transition-colors hover:bg-gray-100"><Mic className="h-5 w-5" /></button>
             </div>
             {searchFocused && <div id="destination-suggestions" role="listbox" className="destination-suggestion-panel absolute left-0 right-0 top-full z-40 mt-2 max-h-[min(60vh,420px)] overflow-y-auto rounded-2xl border border-white/80 bg-white/95 shadow-2xl backdrop-blur-xl">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white/95 px-4 py-3 backdrop-blur-xl"><div><p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#A04100]">Choose your destination</p><p className="mt-0.5 text-xs text-gray-500">Ahmedabad · Gandhinagar · Vadodara</p></div><span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold text-[#A04100]">{locationSuggestions.length} places</span></div>
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white/95 px-4 py-3 backdrop-blur-xl"><div><p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#A04100]">Choose your destination</p><p className="mt-0.5 text-xs text-gray-500">Ahmedabad · Gandhinagar · Vadodara · anywhere in India</p></div><span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold text-[#A04100]">{locationSuggestions.length + googlePredictions.length} places</span></div>
+              {googlePredictions.length > 0 && (
+                <div className="border-b border-gray-100 bg-blue-50/60">
+                  <p className="px-4 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-blue-700">Google results</p>
+                  {googlePredictions.map((prediction) => <button key={prediction.placeId} role="option" aria-selected="false" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => handleGooglePrediction(prediction)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-white/80">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm">🔍</span>
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-gray-900">{prediction.primary}</span><span className="mt-0.5 block truncate text-xs text-gray-500">{prediction.secondary}</span></span>
+                  </button>)}
+                </div>
+              )}
               {locationSuggestions.length ? locationSuggestions.map((location, index) => <button key={`${location.lat}-${location.lng}`} role="option" aria-selected="false" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchQuery(location.name); setSearchFocused(false); handleQuickDestination(location); }} className="destination-suggestion-row flex w-full items-start gap-3 border-b border-gray-100/80 px-4 py-3 text-left last:border-0">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F0F3FF] text-[#A04100]"><MapPin size={16} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-gray-900">{location.name}</span><span className="mt-0.5 block truncate text-xs text-gray-500">{location.address}</span><span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">{location.area}{location.landmark ? ` · ${location.landmark}` : ''}</span></span><span className="pt-1 text-[10px] font-bold text-gray-400">{String(index + 1).padStart(2, '0')}</span>
               </button>) : <p className="px-4 py-6 text-center text-sm text-gray-500">No matching addresses. Try another Ahmedabad area or landmark.</p>}

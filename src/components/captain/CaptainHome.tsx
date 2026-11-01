@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   RotateCcw
 } from 'lucide-react';
+import { authApi, USE_REMOTE_AUTH, liveApi } from '../../services/api';
 
 interface CaptainHomeProps {
   onOpenTripExecution: (rideId: string) => void;
@@ -97,6 +98,23 @@ export const CaptainHome: React.FC<CaptainHomeProps> = ({
   const handleToggleDuty = () => {
     store.toggleCaptainDuty(captain.id);
     const willBeOnline = !captain.isOnline;
+    // Broadcast the captain's GPS beacon to the fleet feed.
+    const session = authApi.getSession();
+    if (USE_REMOTE_AUTH && session) {
+      if (willBeOnline && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            liveApi.postLocation(session.token, position.coords.latitude, position.coords.longitude).catch(() => { /* beacon is best-effort */ });
+          },
+          () => { /* GPS denied — captain stays off the live map until next beacon */ },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else if (!willBeOnline) {
+        fetch(`${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/live/location`, {
+          method: 'DELETE', headers: { Authorization: `Bearer ${session.token}` }
+        }).catch(() => { /* best-effort offline beacon */ });
+      }
+    }
     showToast(
       willBeOnline
         ? 'Captain is now ONLINE and visible on map'

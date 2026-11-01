@@ -25,6 +25,7 @@ app.use(express.json({ limit: '100kb' }));
 const authRoutes = require('./routes/auth');
 const driverRoutes = require('./routes/driver');
 const adminRoutes = require('./routes/admin');
+const liveRoutes = require('./routes/live');
 const { authenticate, getJwtSecret } = require('./middleware/auth');
 
 getJwtSecret();
@@ -32,6 +33,7 @@ getJwtSecret();
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', authenticate, driverRoutes);
 app.use('/api/admin', authenticate, adminRoutes);
+app.use('/api/live', liveRoutes);
 
 app.get('/api/health', async (_req, res, next) => {
   try {

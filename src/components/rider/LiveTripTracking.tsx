@@ -11,8 +11,11 @@ import {
   Share2,
   CheckCircle2,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  IndianRupee
 } from 'lucide-react';
+import { RideChat } from './RideChat';
+import { authApi, USE_REMOTE_AUTH, liveApi } from '../../services/api';
 
 interface LiveTripTrackingProps {
   rideId: string;
@@ -29,6 +32,9 @@ export const LiveTripTracking: React.FC<LiveTripTrackingProps> = ({
     return store.getState().rides.find((r) => r.id === rideId) || null;
   });
   const [chatMessageSent, setChatMessageSent] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [paymentState, setPaymentState] = useState<'idle' | 'creating' | 'awaiting' | 'paid' | 'failed'>('idle');
+  const [paymentNote, setPaymentNote] = useState('');
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('Changed my mind');
   const [simulatedEta, setSimulatedEta] = useState('3 mins (0.8 km away)');
@@ -76,6 +82,23 @@ export const LiveTripTracking: React.FC<LiveTripTrackingProps> = ({
     setChatMessageSent(msg);
     setTimeout(() => setChatMessageSent(null), 3000);
   };
+
+  const handlePayNow = () => {
+    if (!USE_REMOTE_AUTH) { setPaymentState('failed'); setPaymentNote('UPI payment connects when the ride API is configured (VITE_AUTH_MODE=api).'); return; }
+    const session = authApi.getSession();
+    if (!session) return;
+    setPaymentState('creating'); setPaymentNote('');
+    liveApi.paymentOrder(session.token, ride.id, ride.fare.totalFare)
+      .then((order) => liveApi.paymentConfirm(session.token, order.orderId))
+      .then(() => { setPaymentState('paid'); setPaymentNote('Payment received — thank you!'); })
+      .catch((cause: unknown) => {
+        setPaymentState('failed');
+        setPaymentNote(cause instanceof Error ? cause.message : 'Payment could not be completed.');
+      });
+  };
+
+  const isCompleted = ride.status === 'COMPLETED';
+  const isUpi = ride.paymentMethod === 'Google Pay / UPI';
 
   const handleConfirmCancel = () => {
     store.cancelRide(ride.id, cancelReason);
@@ -145,6 +168,7 @@ export const LiveTripTracking: React.FC<LiveTripTrackingProps> = ({
             etaText={simulatedEta}
             trafficStatus="Moderate Traffic"
           />
+          <RideChat rideId={ride.id} open={chatOpen} onToggle={() => setChatOpen((prev) => !prev)} peerName={ride.captainName || 'Captain'} />
         </div>
 
         {/* Bottom Sheet Live Card */}
@@ -312,6 +336,31 @@ export const LiveTripTracking: React.FC<LiveTripTrackingProps> = ({
               ))}
             </div>
           </div>
+
+          {/* UPI Payment (shown after completion for UPI rides) */}
+          {isCompleted && isUpi && paymentState !== 'paid' && (
+            <div className="rounded-xl border border-green-100 bg-green-50 p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center shrink-0"><IndianRupee className="w-4 h-4 text-green-700" /></div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-gray-900">Pay ₹{ride.fare.totalFare} via UPI</span>
+                  <span className="text-[10px] text-gray-500">Secure Razorpay · GPay, PhonePe, Paytm</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handlePayNow}
+                disabled={paymentState === 'creating'}
+                className="rounded-xl bg-green-700 px-3.5 py-2 text-xs font-bold text-white shadow-md disabled:opacity-60"
+              >
+                {paymentState === 'creating' ? 'Processing…' : 'Pay Now'}
+              </button>
+            </div>
+          )}
+          {paymentState === 'paid' && (
+            <div className="rounded-xl bg-green-100 px-3.5 py-2.5 text-xs font-bold text-green-800 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Payment of ₹{ride.fare.totalFare} received</div>
+          )}
+          {paymentState === 'failed' && paymentNote && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{paymentNote}</p>}
 
           {/* Trip Route Overview Card */}
           <div className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-200 flex items-start gap-3">

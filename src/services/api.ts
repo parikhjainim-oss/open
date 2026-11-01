@@ -240,6 +240,46 @@ export const authApi = {
   clearSession() { localStorage.removeItem(SESSION_KEY); },
 };
 
+// ---------- Live operations API (routes, GPS, chat, payments) ----------
+export interface RouteResult { source: string; distanceKm: number; etaMins: number; polyline: string | null; }
+export interface LiveCaptain { id: string; lat: number; lng: number; heading?: number | null; vehicleType?: string | null; vehicleNumber?: string | null; name?: string | null; updatedAt: string; }
+export interface RideChatMessage { id: number; senderId?: string; senderRole: 'rider' | 'driver'; text: string; createdAt: string; }
+
+export const liveApi = {
+  route(payload: { pickup: { lat: number; lng: number }; drop: { lat: number; lng: number } }) {
+    return USE_REMOTE_AUTH
+      ? request<RouteResult>('/api/live/route', { method: 'POST', body: JSON.stringify(payload) })
+      : Promise.resolve((() => {
+          const km = Math.hypot(payload.drop.lat - payload.pickup.lat, payload.drop.lng - payload.pickup.lng) * 111 * 1.35;
+          const distanceKm = Math.round(km * 10) / 10;
+          return { source: 'local_estimate', distanceKm, etaMins: Math.max(4, Math.round((distanceKm / 24) * 60 + 2)), polyline: null };
+        })());
+  },
+  async captains(token: string, lat: number, lng: number): Promise<LiveCaptain[]> {
+    if (!USE_REMOTE_AUTH) return [];
+    const data = await request<{ captains: LiveCaptain[] }>(`/api/live/captains?lat=${lat}&lng=${lng}`, {}, token);
+    return data.captains || [];
+  },
+  postLocation(token: string, lat: number, lng: number, heading?: number) {
+    if (!USE_REMOTE_AUTH) return Promise.resolve({ ok: true });
+    return request('/api/live/location', { method: 'POST', body: JSON.stringify({ lat, lng, heading }) }, token);
+  },
+  messages(token: string, rideId: string, after = 0) {
+    if (!USE_REMOTE_AUTH) return Promise.resolve({ messages: [] as RideChatMessage[] });
+    return request<{ messages: RideChatMessage[] }>(`/api/live/rides/${encodeURIComponent(rideId)}/messages?after=${after}`, {}, token);
+  },
+  sendMessage(token: string, rideId: string, text: string): Promise<{ message: RideChatMessage | null }> {
+    if (!USE_REMOTE_AUTH) return Promise.resolve({ message: null });
+    return request<{ message: RideChatMessage | null }>('/api/live/rides/' + encodeURIComponent(rideId) + '/messages', { method: 'POST', body: JSON.stringify({ text }) }, token);
+  },
+  paymentOrder(token: string, rideId: string, amount: number) {
+    return request<{ provider: string; orderId: string; amountPaise: number; keyId: string | null }>('/api/live/payments/order', { method: 'POST', body: JSON.stringify({ rideId, amount }) }, token);
+  },
+  paymentConfirm(token: string, orderId: string) {
+    return request<{ ok: boolean; paymentRef?: string }>('/api/live/payments/confirm', { method: 'POST', body: JSON.stringify({ orderId }) }, token);
+  },
+};
+
 export interface AdminAccount {
   id: string;
   email: string;
