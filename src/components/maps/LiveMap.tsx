@@ -90,6 +90,116 @@ const markerContent = (kind: 'pickup' | 'drop') => {
   return element;
 };
 
+import leaflet from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Compass } from 'lucide-react';
+
+interface OsmFallbackMapProps {
+  pickup?: LocationPoint;
+  drop?: LocationPoint;
+  captains?: NearbyCaptainPoint[];
+  onPickLocation?: (lat: number, lng: number) => void;
+  height?: number;
+  zoom?: number;
+}
+
+/**
+ * Fallback interactive map (OpenStreetMap tiles via Leaflet) rendered while no
+ * Google Maps browser key is configured. It pans to GPS, supports markers and
+ * a route polyline — the same interactive experience Uber/Rapido offer, minus
+ * Google's commercial tiles. Swaps to Google Maps automatically once a
+ * VITE_GOOGLE_MAPS_BROWSER_KEY is present in the environment.
+ */
+export const OsmFallbackMap: React.FC<OsmFallbackMapProps> = ({
+  pickup, drop, captains, onPickLocation, height = 360, zoom = 13,
+}) => {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<leaflet.Map | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready'>('loading');
+  const [captainDots, setCaptainDots] = useState<{ lat: number; lng: number; label?: string }[]>([]);
+
+  useEffect(() => { setCaptainDots(captains || []); }, [captains]);
+
+  useEffect(() => {
+    if (!elementRef.current || mapRef.current) return;
+    const center: LatLng = pickup ? { lat: pickup.lat, lng: pickup.lng } : drop ? { lat: drop.lat, lng: drop.lng } : { lat: 23.0225, lng: 72.5714 };
+    const map = leaflet.map(elementRef.current, { center: [center.lat, center.lng], zoom, zoomControl: true, attributionControl: true });
+    leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+    mapRef.current = map;
+    setStatus('ready');
+    return () => { map.remove(); mapRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pan to GPS pickup when it changes.
+  useEffect(() => {
+    if (pickup && mapRef.current) mapRef.current.setView([pickup.lat, pickup.lng], zoom);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickup?.lat, pickup?.lng]);
+
+  // Render markers + route polyline.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !status) return;
+    map.eachLayer((layer) => {
+      if (layer instanceof leaflet.Marker || layer instanceof leaflet.Polyline) map.removeLayer(layer);
+    });
+    if (pickup) {
+      leaflet.marker([pickup.lat, pickup.lng], { title: 'Pickup' }).addTo(map)
+        .bindPopup(`<strong>Pickup</strong><br/>${pickup.name ?? ''}`);
+    }
+    if (drop) {
+      leaflet.marker([drop.lat, drop.lng], { title: 'Destination' }).addTo(map)
+        .bindPopup(`<strong>Destination</strong><br/>${drop.name ?? ''}`).openPopup();
+    }
+    if (pickup && drop) {
+      leaflet.polyline([[pickup.lat, pickup.lng], [drop.lat, drop.lng]], { color: '#FF6B00', weight: 5, opacity: 0.9 }).addTo(map);
+    }
+    captainDots.forEach((dot) => {
+      leaflet.circleMarker([dot.lat, dot.lng], {
+        radius: 7, color: '#0053DB', fillColor: '#0053DB', fillOpacity: 0.9, weight: 2,
+      }).addTo(map).bindPopup(dot.label ?? 'Captain nearby');
+    });
+  }, [pickup, drop, captainDots, status]);
+
+  // Tap-to-pick destination.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onPickLocation) return;
+    const handler = (event: leaflet.LeafletMouseEvent) => {
+      onPickLocation(event.latlng.lat, event.latlng.lng);
+    };
+    map.on('click', handler);
+    return () => { map.off('click', handler); };
+  }, [onPickLocation, status]);
+
+  // GPS recentre button.
+  const recenter = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((position) => {
+      mapRef.current?.setView([position.coords.latitude, position.coords.longitude], zoom);
+    }, () => { /* GPS denied */ }, { enableHighAccuracy: true, timeout: 10000 });
+  };
+
+  return (
+    <div className="relative w-full" style={{ height }}>
+      <div ref={elementRef} className="w-full" style={{ height }} />
+      {status === 'loading' && <p className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">Loading map…</p>}
+      <button type="button" onClick={recenter} aria-label="Recenter on GPS" className="absolute bottom-3 right-3 z-10 rounded-full bg-white p-2.5 text-gray-700 shadow-lg hover:text-[#FF6B00]">
+        <Compass className="h-5 w-5" />
+      </button>
+      {!import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY ? (
+        <div className="absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#171717]/85 px-3 py-1.5 text-[10px] font-semibold text-white shadow-lg">
+          Free map preview — add VITE_GOOGLE_MAPS_BROWSER_KEY for Google tiles
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export const LiveMap: React.FC<LiveMapProps> = ({
   lat = 23.0225,
   lng = 72.5714,

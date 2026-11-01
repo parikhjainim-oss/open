@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Header } from '../common/Header';
-import { LiveMap } from '../maps/LiveMap';
+import { LiveMap, OsmFallbackMap } from '../maps/LiveMap';
 import { store, AHMEDABAD_LOCATIONS } from '../../services/store';
 import { LocationPoint, RideServiceType, VehicleCategory } from '../../types';
 import type { NearbyCaptainPoint } from '../maps/LiveMap';
@@ -120,16 +120,29 @@ export const RiderHome: React.FC<RiderHomeProps> = ({
       <main className="flex flex-col w-full pt-20">
         {/* Real Google map when configured; map taps set the pickup pin. */}
         <div className="px-3">
-          <LiveMap
-            height="380px"
-            pickup={selectedPickup}
-            drop={selectedDrop}
-            nearbyCaptains={nearbyCaptains}
-            onMapSelect={(point) => {
-              setSelectedPickup({ ...point, name: 'Pickup pin', area: 'Selected on map' });
-              setLocationMessage('Pickup pin updated on the map.');
-            }}
-          />
+          {import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY ? (
+            <LiveMap
+              height="380px"
+              pickup={selectedPickup}
+              drop={selectedDrop}
+              nearbyCaptains={nearbyCaptains}
+              onMapSelect={(point) => {
+                setSelectedPickup({ ...point, name: 'Pickup pin', area: 'Selected on map' });
+                setLocationMessage('Pickup pin updated on the map.');
+              }}
+            />
+          ) : (
+            <OsmFallbackMap
+              height={380}
+              pickup={selectedPickup}
+              drop={selectedDrop}
+              captains={nearbyCaptains}
+              onPickLocation={(lat, lng) => {
+                setSelectedPickup({ lat, lng, name: 'Pickup pin', address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, area: 'Selected on map' });
+                setLocationMessage('Pickup pin updated on the map.');
+              }}
+            />
+          )}
           <div className="-mt-9 relative z-10 mx-auto w-fit rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-gray-600 shadow">
             Tap map to set pickup · <button type="button" onClick={requestLocation} className="text-[#A04100] underline">Use my location</button>
           </div>
